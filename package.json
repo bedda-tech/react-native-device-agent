@@ -1,0 +1,55 @@
+{
+  "name": "react-native-device-agent",
+  "version": "0.1.0",
+  "description": "Agent orchestration loop for on-device AI phone control. Connects LLM reasoning to phone actions via accessibility APIs.",
+  "main": "lib/commonjs/index.js",
+  "module": "lib/module/index.js",
+  "types": "lib/typescript/index.d.ts",
+  "source": "src/index.ts",
+  "files": [
+    "src",
+    "lib",
+    "!**/__tests__",
+    "!**/__fixtures__",
+    "!**/__mocks__"
+  ],
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "test": "jest",
+    "clean": "rm -rf lib/"
+  },
+  "keywords": [
+    "react-native",
+    "ai-agent",
+    "phone-agent",
+    "llm",
+    "on-device",
+    "gemma",
+    "accessibility",
+    "automation",
+    "deft"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bedda-tech/react-native-device-agent.git"
+  },
+  "author": "Bedda Tech <matt@bedda.tech> (https://bedda.tech)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/bedda-tech/react-native-device-agent/issues"
+  },
+  "homepage": "https://github.com/bedda-tech/react-native-device-agent#readme",
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-native": ">=0.76.0",
+    "react-native-accessibility-controller": ">=0.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "react": "^18.0.0",
+    "react-native": "^0.76.0",
+    "typescript": "^5.0.0"
+  }
+}
