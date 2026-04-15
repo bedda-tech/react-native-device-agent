@@ -36,7 +36,11 @@ export { PHONE_TOOLS } from './tools/PhoneTools';
 
 export { LLMProvider } from './providers/LLMProvider';
 export { GemmaProvider } from './providers/GemmaProvider';
+export type { GemmaProviderOptions } from './providers/GemmaProvider';
 export { CloudProvider } from './providers/CloudProvider';
+export type { CloudProviderOptions } from './providers/CloudProvider';
+export { FallbackProvider } from './providers/FallbackProvider';
+export type { FallbackProviderOptions, ComplexityHeuristics } from './providers/FallbackProvider';
 
 // ---------------------------------------------------------------------------
 // React hooks
