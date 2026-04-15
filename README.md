@@ -188,6 +188,28 @@ const { isRunning, history, execute, stop } = useAgent(options);
 | [react-native-executorch](https://github.com/bedda-tech/react-native-executorch) | On-device LLM inference (Gemma 4) via ExecuTorch |
 | [deft](https://github.com/bedda-tech/deft) | The consumer app combining all three |
 
+## Contributing
+
+Contributions are welcome. This is the orchestration layer -- improvements to the agent loop, new built-in tools, and better provider abstractions are all good targets.
+
+**Setup**
+
+```bash
+git clone https://github.com/bedda-tech/react-native-device-agent.git
+cd react-native-device-agent
+npm install
+npm run typecheck
+```
+
+**Guidelines**
+
+- All code is TypeScript strict -- `npm run typecheck` must exit 0
+- New tools must implement the `Tool` interface and be registered via `ToolRegistry`
+- New providers must implement the `LLMProvider` interface
+- The `AgentLoop` observe/think/act contract must not change in a backwards-incompatible way
+- Add a `useAgent` option for any new loop configuration
+- Open an issue before starting large changes
+
 ## License
 
 MIT
