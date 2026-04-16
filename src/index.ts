@@ -22,6 +22,8 @@ export type {
 export { AgentLoop } from './agent/AgentLoop';
 export { ScreenSerializer } from './agent/ScreenSerializer';
 export { ToolParser } from './agent/ToolParser';
+export { TaskPlanner } from './agent/TaskPlanner';
+export type { SubTask, PlannerEvent, TaskPlannerOptions } from './agent/TaskPlanner';
 
 // ---------------------------------------------------------------------------
 // Tools
