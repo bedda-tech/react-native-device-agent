@@ -1,5 +1,6 @@
 import type { AgentEvent, AgentOptions, ToolCall, Tool } from '../types';
 import { ScreenSerializer } from './ScreenSerializer';
+import { ScreenshotPreprocessor } from './ScreenshotPreprocessor';
 import { ToolParser } from './ToolParser';
 import { PHONE_TOOLS } from '../tools/PhoneTools';
 import { ToolRegistry } from '../tools/ToolRegistry';
@@ -48,7 +49,7 @@ function getController() {
  * task is complete or the step limit is reached.
  */
 export class AgentLoop {
-  private options: AgentOptions & { maxSteps: number; settleMs: number };
+  private options: AgentOptions & { maxSteps: number; settleMs: number; useVision: boolean };
   private aborted = false;
   private registry: ToolRegistry;
   private tools: Tool[];
@@ -57,6 +58,7 @@ export class AgentLoop {
     this.options = {
       maxSteps: 20,
       settleMs: 500,
+      useVision: false,
       ...options,
     };
     this.registry = new ToolRegistry();

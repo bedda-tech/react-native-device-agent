@@ -8,6 +8,17 @@ export interface AgentOptions {
   maxSteps?: number;
   /** Milliseconds to wait after an action for the screen to settle. Default: 500. */
   settleMs?: number;
+  /**
+   * Enable vision mode: capture a screenshot at each observation step and
+   * pass it to the provider alongside the accessibility tree text.
+   *
+   * Requires `provider` to implement `generateWithVision` (e.g. GemmaProvider
+   * configured with a `generateWithImageFn`). Falls back to text-only if the
+   * provider does not implement `generateWithVision`.
+   *
+   * Default: false.
+   */
+  useVision?: boolean;
   /** Callback invoked on every action the agent takes. */
   onAction?: (action: AgentAction) => void;
   /** Callback invoked when the agent completes a task. */
@@ -21,7 +32,7 @@ export interface AgentOptions {
  */
 export type AgentEvent =
   | { type: 'action'; tool: string; args: Record<string, unknown> }
-  | { type: 'observation'; screenState: string; step: number }
+  | { type: 'observation'; screenState: string; step: number; screenshotPath?: string }
   | { type: 'thinking'; content: string }
   | { type: 'complete'; result: string }
   | { type: 'error'; error: Error }
@@ -79,6 +90,18 @@ export interface LLMProviderInterface {
   generate(prompt: string): Promise<string>;
   /** Generate a response with tool-calling support. */
   generateWithTools(prompt: string, tools: Tool[]): Promise<string>;
+  /**
+   * Generate a response with tool-calling support and a screenshot image.
+   * Providers that do not support vision may fall back to `generateWithTools`.
+   * @param prompt - The text prompt
+   * @param tools - Available tools
+   * @param imagePath - Local file path to the screenshot (no `file://` prefix)
+   */
+  generateWithVision?(
+    prompt: string,
+    tools: Tool[],
+    imagePath: string,
+  ): Promise<string>;
 }
 
 /**

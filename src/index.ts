@@ -47,3 +47,5 @@ export type { FallbackProviderOptions, ComplexityHeuristics } from './providers/
 // ---------------------------------------------------------------------------
 
 export { useAgent } from './hooks/useAgent';
+export { useAgentChat } from './hooks/useAgentChat';
+export type { UseAgentChatState } from './hooks/useAgentChat';
