@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "device-agent-example",
+    "slug": "react-native-device-agent-example",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0a0a0a"
+      }
+    },
+    "newArchEnabled": true
+  }
+}
