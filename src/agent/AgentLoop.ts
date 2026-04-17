@@ -90,10 +90,19 @@ export class AgentLoop {
       // Build the prompt
       const prompt = this.buildPrompt(task, screenState, history);
 
-      // LLM inference
+      // LLM inference (vision or text-only)
       let response: string;
       try {
-        response = await this.options.provider.generateWithTools(prompt, this.tools);
+        if (this.options.useVision && this.options.provider.generateWithVision) {
+          const screenshotPath = await this.captureScreenshot();
+          if (screenshotPath) {
+            response = await this.options.provider.generateWithVision(prompt, this.tools, screenshotPath);
+          } else {
+            response = await this.options.provider.generateWithTools(prompt, this.tools);
+          }
+        } else {
+          response = await this.options.provider.generateWithTools(prompt, this.tools);
+        }
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         yield { type: 'error', error };
@@ -156,8 +165,12 @@ export class AgentLoop {
       if (this.aborted) break;
 
       // Observe new screen state
+      let screenshotPath: string | undefined;
       try {
         screenState = await this.readScreen();
+        if (this.options.useVision) {
+          screenshotPath = (await this.captureScreenshot()) ?? undefined;
+        }
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         yield { type: 'error', error };
@@ -165,7 +178,7 @@ export class AgentLoop {
       }
 
       steps++;
-      const obsEvent: AgentEvent = { type: 'observation', screenState, step: steps };
+      const obsEvent: AgentEvent = { type: 'observation', screenState, step: steps, screenshotPath };
       history.push(obsEvent);
       yield obsEvent;
     }
@@ -188,6 +201,16 @@ export class AgentLoop {
     const ctrl = getController();
     const tree = await ctrl.getAccessibilityTree();
     return ScreenSerializer.serialize(tree);
+  }
+
+  private async captureScreenshot(): Promise<string | null> {
+    try {
+      const ctrl = getController();
+      const raw = await ctrl.takeScreenshot();
+      return ScreenshotPreprocessor.normalizePath(raw);
+    } catch {
+      return null;
+    }
   }
 
   private buildPrompt(task: string, screenState: string, history: AgentEvent[]): string {
