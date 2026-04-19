@@ -84,7 +84,7 @@ export class FallbackProvider extends LLMProvider {
    * complexity heuristics indicate the task exceeds on-device capabilities.
    */
   async generate(prompt: string): Promise<string> {
-    if (this.shouldUsCloud(prompt)) {
+    if (this.shouldUseCloud(prompt)) {
       this.log('complexity check → using cloud provider');
       return this.cloud.generate(prompt);
     }
@@ -108,7 +108,7 @@ export class FallbackProvider extends LLMProvider {
    * the underlying generate call throws.
    */
   async generateWithTools(prompt: string, tools: Tool[]): Promise<string> {
-    if (this.shouldUsCloud(prompt)) {
+    if (this.shouldUseCloud(prompt)) {
       this.log('complexity check → using cloud provider');
       return this.cloud.generateWithTools(prompt, tools);
     }
@@ -150,7 +150,7 @@ export class FallbackProvider extends LLMProvider {
    * Determine whether this request should bypass on-device inference entirely
    * and go straight to the cloud provider.
    */
-  private shouldUsCloud(prompt: string): boolean {
+  private shouldUseCloud(prompt: string): boolean {
     // Too many prior failures → stay on cloud for the rest of the session
     if (this.onDeviceFailures >= this.maxOnDeviceFailures) {
       return true;
