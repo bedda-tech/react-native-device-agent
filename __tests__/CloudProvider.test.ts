@@ -237,3 +237,106 @@ describe('CloudProvider default options', () => {
     expect(url).toContain('/chat/completions');
   });
 });
+
+// ---------------------------------------------------------------------------
+// System prompt injection
+// ---------------------------------------------------------------------------
+
+describe('CloudProvider system prompt', () => {
+  afterEach(() => { jest.restoreAllMocks(); });
+
+  test('OpenAI: prepends system message before user message', async () => {
+    const provider = new CloudProvider({
+      apiKey: 'key',
+      model: 'gpt-4o',
+      apiFormat: 'openai',
+      system: 'You are a phone control agent.',
+    });
+    global.fetch = makeFetchMock({
+      choices: [{ message: { content: 'ok' } }],
+    });
+
+    await provider.generate('Tap the button');
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body.messages).toHaveLength(2);
+    expect(body.messages[0]).toEqual({ role: 'system', content: 'You are a phone control agent.' });
+    expect(body.messages[1]).toEqual({ role: 'user', content: 'Tap the button' });
+  });
+
+  test('OpenAI: no system message when system is unset', async () => {
+    const provider = new CloudProvider({ apiKey: 'key', model: 'gpt-4o', apiFormat: 'openai' });
+    global.fetch = makeFetchMock({ choices: [{ message: { content: 'ok' } }] });
+
+    await provider.generate('hi');
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body.messages).toHaveLength(1);
+    expect(body.messages[0].role).toBe('user');
+  });
+
+  test('OpenAI: generateWithTools also prepends system message', async () => {
+    const provider = new CloudProvider({
+      apiKey: 'key',
+      model: 'gpt-4o',
+      apiFormat: 'openai',
+      system: 'Agent system prompt',
+    });
+    global.fetch = makeFetchMock({ choices: [{ message: { content: 'ok' } }] });
+
+    await provider.generateWithTools('Do something', [SAMPLE_TOOL]);
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body.messages[0]).toEqual({ role: 'system', content: 'Agent system prompt' });
+  });
+
+  test('Anthropic: includes top-level system field', async () => {
+    const provider = new CloudProvider({
+      apiKey: 'key',
+      model: 'claude-sonnet-4-6',
+      baseUrl: 'https://api.anthropic.com/v1',
+      apiFormat: 'anthropic',
+      system: 'You control the phone.',
+    });
+    global.fetch = makeFetchMock({
+      content: [{ type: 'text', text: 'ok' }],
+    });
+
+    await provider.generate('What is on screen?');
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body.system).toBe('You control the phone.');
+    expect(body.messages).toEqual([{ role: 'user', content: 'What is on screen?' }]);
+  });
+
+  test('Anthropic: no system field when system is unset', async () => {
+    const provider = new CloudProvider({
+      apiKey: 'key',
+      model: 'claude-sonnet-4-6',
+      baseUrl: 'https://api.anthropic.com/v1',
+      apiFormat: 'anthropic',
+    });
+    global.fetch = makeFetchMock({ content: [{ type: 'text', text: 'ok' }] });
+
+    await provider.generate('hi');
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body.system).toBeUndefined();
+  });
+
+  test('Anthropic: generateWithTools also passes system field', async () => {
+    const provider = new CloudProvider({
+      apiKey: 'key',
+      model: 'claude-sonnet-4-6',
+      baseUrl: 'https://api.anthropic.com/v1',
+      apiFormat: 'anthropic',
+      system: 'Agent prompt',
+    });
+    global.fetch = makeFetchMock({ content: [{ type: 'text', text: 'ok' }] });
+
+    await provider.generateWithTools('Do something', [SAMPLE_TOOL]);
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body.system).toBe('Agent prompt');
+  });
+});

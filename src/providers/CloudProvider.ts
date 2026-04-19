@@ -33,10 +33,18 @@ export interface CloudProviderOptions {
    * - 'anthropic': Anthropic messages API
    */
   apiFormat?: 'openai' | 'anthropic';
+  /**
+   * Optional system prompt injected into every API request.
+   *
+   * For Anthropic this maps to the top-level `system` field (recommended).
+   * For OpenAI it is prepended as a `role: 'system'` message.
+   * Leave unset to use the model's default behaviour.
+   */
+  system?: string;
 }
 
 export class CloudProvider extends LLMProvider {
-  private options: Required<CloudProviderOptions>;
+  private options: Required<Omit<CloudProviderOptions, 'system'>> & { system: string | undefined };
 
   constructor(options: CloudProviderOptions) {
     super();
@@ -45,6 +53,7 @@ export class CloudProvider extends LLMProvider {
       maxTokens: 1024,
       temperature: 0.7,
       apiFormat: 'openai',
+      system: undefined,
       ...options,
     };
   }
@@ -76,9 +85,12 @@ export class CloudProvider extends LLMProvider {
   // ---------------------------------------------------------------------------
 
   private async openaiGenerate(prompt: string): Promise<string> {
+    const messages = this.options.system
+      ? [{ role: 'system', content: this.options.system }, { role: 'user', content: prompt }]
+      : [{ role: 'user', content: prompt }];
     const response = await this.fetchJson(`${this.options.baseUrl}/chat/completions`, {
       model: this.options.model,
-      messages: [{ role: 'user', content: prompt }],
+      messages,
       max_tokens: this.options.maxTokens,
       temperature: this.options.temperature,
     });
@@ -88,10 +100,13 @@ export class CloudProvider extends LLMProvider {
 
   private async openaiGenerateWithTools(prompt: string, tools: Tool[]): Promise<string> {
     const openaiTools = tools.map(toOpenAIFunction);
+    const messages = this.options.system
+      ? [{ role: 'system', content: this.options.system }, { role: 'user', content: prompt }]
+      : [{ role: 'user', content: prompt }];
 
     const response = await this.fetchJson(`${this.options.baseUrl}/chat/completions`, {
       model: this.options.model,
-      messages: [{ role: 'user', content: prompt }],
+      messages,
       tools: openaiTools,
       tool_choice: 'auto',
       max_tokens: this.options.maxTokens,
@@ -129,13 +144,15 @@ export class CloudProvider extends LLMProvider {
   // ---------------------------------------------------------------------------
 
   private async anthropicGenerate(prompt: string): Promise<string> {
+    const body: Record<string, unknown> = {
+      model: this.options.model,
+      max_tokens: this.options.maxTokens,
+      messages: [{ role: 'user', content: prompt }],
+    };
+    if (this.options.system) body.system = this.options.system;
     const response = await this.fetchJson(
       `${this.options.baseUrl}/messages`,
-      {
-        model: this.options.model,
-        max_tokens: this.options.maxTokens,
-        messages: [{ role: 'user', content: prompt }],
-      },
+      body,
       {
         'x-api-key': this.options.apiKey,
         'anthropic-version': '2023-06-01',
@@ -156,14 +173,16 @@ export class CloudProvider extends LLMProvider {
       },
     }));
 
+    const anthropicBody: Record<string, unknown> = {
+      model: this.options.model,
+      max_tokens: this.options.maxTokens,
+      tools: anthropicTools,
+      messages: [{ role: 'user', content: prompt }],
+    };
+    if (this.options.system) anthropicBody.system = this.options.system;
     const response = await this.fetchJson(
       `${this.options.baseUrl}/messages`,
-      {
-        model: this.options.model,
-        max_tokens: this.options.maxTokens,
-        tools: anthropicTools,
-        messages: [{ role: 'user', content: prompt }],
-      },
+      anthropicBody,
       {
         'x-api-key': this.options.apiKey,
         'anthropic-version': '2023-06-01',
