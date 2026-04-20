@@ -125,6 +125,42 @@ export class FallbackProvider extends LLMProvider {
   }
 
   /**
+   * Generate a response with tool-calling support and a screenshot image.
+   *
+   * Delegates vision inference to the on-device provider (GemmaProvider
+   * supports image input via its `generateWithVision` method). Falls back to
+   * cloud text-only inference when:
+   *   - Complexity heuristics say to skip on-device
+   *   - The on-device call throws
+   *
+   * Cloud providers do not currently support vision in the fallback path, so
+   * the cloud fallback uses `generateWithTools` (text-only). This is a safe
+   * degradation — the accessibility tree text still provides full UI context.
+   */
+  async generateWithVision(
+    prompt: string,
+    tools: Tool[],
+    imagePath: string,
+  ): Promise<string> {
+    if (this.shouldUseCloud(prompt)) {
+      this.log('complexity check → using cloud provider (vision degraded to text-only)');
+      return this.cloud.generateWithTools(prompt, tools);
+    }
+
+    try {
+      const result = await this.onDevice.generateWithVision(prompt, tools, imagePath);
+      this.onDeviceFailures = 0;
+      return result;
+    } catch (err) {
+      this.onDeviceFailures++;
+      this.log(
+        `on-device generateWithVision failed (failures=${this.onDeviceFailures}): ${String(err)}`,
+      );
+      return this.cloud.generateWithTools(prompt, tools);
+    }
+  }
+
+  /**
    * Reset the failure counter.
    *
    * Call this after a successful task completes to give the on-device

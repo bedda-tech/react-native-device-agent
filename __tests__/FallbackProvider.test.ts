@@ -9,10 +9,11 @@ import type { Tool } from '../src/types';
 
 function makeOnDevice(
   response = 'on-device response',
-): jest.Mocked<Pick<GemmaProvider, 'generate' | 'generateWithTools'>> {
+): jest.Mocked<Pick<GemmaProvider, 'generate' | 'generateWithTools' | 'generateWithVision'>> {
   return {
     generate: jest.fn().mockResolvedValue(response),
     generateWithTools: jest.fn().mockResolvedValue(response),
+    generateWithVision: jest.fn().mockResolvedValue(response),
   };
 }
 
@@ -25,10 +26,11 @@ function makeCloud(
   };
 }
 
-function makeFailingOnDevice(): jest.Mocked<Pick<GemmaProvider, 'generate' | 'generateWithTools'>> {
+function makeFailingOnDevice(): jest.Mocked<Pick<GemmaProvider, 'generate' | 'generateWithTools' | 'generateWithVision'>> {
   return {
     generate: jest.fn().mockRejectedValue(new Error('on-device failed')),
     generateWithTools: jest.fn().mockRejectedValue(new Error('on-device failed')),
+    generateWithVision: jest.fn().mockRejectedValue(new Error('on-device failed')),
   };
 }
 
@@ -325,5 +327,90 @@ describe('FallbackProvider complexity defaults', () => {
     // 3rd failure crosses the threshold
     await provider.generate('f3');
     expect(provider.isCloudMode).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateWithVision() tests
+// ---------------------------------------------------------------------------
+
+describe('FallbackProvider.generateWithVision', () => {
+  it('delegates to on-device generateWithVision for short prompts', async () => {
+    const onDevice = makeOnDevice('on-device vision result');
+    const cloud = makeCloud();
+    const provider = new FallbackProvider({
+      onDevice: onDevice as unknown as GemmaProvider,
+      cloud: cloud as unknown as CloudProvider,
+    });
+
+    const result = await provider.generateWithVision('short', TOOLS, '/tmp/screen.png');
+
+    expect(result).toBe('on-device vision result');
+    expect(onDevice.generateWithVision).toHaveBeenCalledWith('short', TOOLS, '/tmp/screen.png');
+    expect(cloud.generateWithTools).not.toHaveBeenCalled();
+  });
+
+  it('degrades to cloud text-only when prompt exceeds maxPromptLength', async () => {
+    const onDevice = makeOnDevice();
+    const cloud = makeCloud('cloud text fallback');
+    const provider = new FallbackProvider({
+      onDevice: onDevice as unknown as GemmaProvider,
+      cloud: cloud as unknown as CloudProvider,
+      complexity: { maxPromptLength: 5 },
+    });
+
+    const result = await provider.generateWithVision('this prompt is too long', TOOLS, '/tmp/screen.png');
+
+    expect(result).toBe('cloud text fallback');
+    expect(onDevice.generateWithVision).not.toHaveBeenCalled();
+    expect(cloud.generateWithTools).toHaveBeenCalledWith('this prompt is too long', TOOLS);
+  });
+
+  it('falls back to cloud text-only when on-device vision throws', async () => {
+    const onDevice = makeFailingOnDevice();
+    const cloud = makeCloud('cloud text on vision failure');
+    const provider = new FallbackProvider({
+      onDevice: onDevice as unknown as GemmaProvider,
+      cloud: cloud as unknown as CloudProvider,
+    });
+
+    const result = await provider.generateWithVision('some task', TOOLS, '/tmp/screen.png');
+
+    expect(result).toBe('cloud text on vision failure');
+    expect(onDevice.generateWithVision).toHaveBeenCalledTimes(1);
+    expect(cloud.generateWithTools).toHaveBeenCalledWith('some task', TOOLS);
+  });
+
+  it('increments failure counter when on-device vision fails', async () => {
+    const onDevice = makeFailingOnDevice();
+    const cloud = makeCloud();
+    const provider = new FallbackProvider({
+      onDevice: onDevice as unknown as GemmaProvider,
+      cloud: cloud as unknown as CloudProvider,
+      complexity: { maxOnDeviceFailures: 2 },
+    });
+
+    await provider.generateWithVision('p1', TOOLS, '/tmp/a.png');
+    await provider.generateWithVision('p2', TOOLS, '/tmp/b.png');
+
+    expect(provider.isCloudMode).toBe(true);
+  });
+
+  it('resets failure counter on successful on-device vision call', async () => {
+    const onDevice = makeOnDevice('vision ok');
+    onDevice.generateWithVision
+      .mockRejectedValueOnce(new Error('fail'))
+      .mockResolvedValueOnce('vision ok');
+    const cloud = makeCloud();
+    const provider = new FallbackProvider({
+      onDevice: onDevice as unknown as GemmaProvider,
+      cloud: cloud as unknown as CloudProvider,
+      complexity: { maxOnDeviceFailures: 3 },
+    });
+
+    await provider.generateWithVision('first fails', TOOLS, '/tmp/a.png');
+    await provider.generateWithVision('second succeeds', TOOLS, '/tmp/b.png');
+
+    expect(provider.isCloudMode).toBe(false);
   });
 });
