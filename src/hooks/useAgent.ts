@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AgentEvent, AgentOptions, UseAgentState } from '../types';
 import { AgentLoop } from '../agent/AgentLoop';
 
@@ -23,45 +23,49 @@ export function useAgent(options: AgentOptions): UseAgentState {
   const [history, setHistory] = useState<AgentEvent[]>([]);
   const loopRef = useRef<AgentLoop | null>(null);
 
-  const execute = useCallback(
-    async (task: string) => {
-      setIsRunning(true);
-      setHistory([]);
+  // Keep options in a ref so callbacks (onAction, onComplete, onError) are
+  // always current without requiring execute() to be recreated on every render.
+  const optionsRef = useRef(options);
+  useEffect(() => {
+    optionsRef.current = options;
+  });
 
-      const loop = new AgentLoop(options);
-      loopRef.current = loop;
+  const execute = useCallback(async (task: string) => {
+    setIsRunning(true);
+    setHistory([]);
 
-      try {
-        for await (const event of loop.run(task)) {
-          setHistory((prev) => [...prev, event]);
+    const loop = new AgentLoop(optionsRef.current);
+    loopRef.current = loop;
 
-          if (event.type === 'action' && options.onAction) {
-            options.onAction({
-              tool: event.tool,
-              args: event.args,
-              timestamp: Date.now(),
-            });
-          }
+    try {
+      for await (const event of loop.run(task)) {
+        setHistory((prev) => [...prev, event]);
 
-          if (event.type === 'complete' && options.onComplete) {
-            options.onComplete(event.result);
-          }
-
-          if (event.type === 'error' && options.onError) {
-            options.onError(event.error);
-          }
+        if (event.type === 'action' && optionsRef.current.onAction) {
+          optionsRef.current.onAction({
+            tool: event.tool,
+            args: event.args,
+            timestamp: Date.now(),
+          });
         }
-      } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        setHistory((prev) => [...prev, { type: 'error', error: err }]);
-        options.onError?.(err);
-      } finally {
-        setIsRunning(false);
-        loopRef.current = null;
+
+        if (event.type === 'complete' && optionsRef.current.onComplete) {
+          optionsRef.current.onComplete(event.result);
+        }
+
+        if (event.type === 'error' && optionsRef.current.onError) {
+          optionsRef.current.onError(event.error);
+        }
       }
-    },
-    [options],
-  );
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      setHistory((prev) => [...prev, { type: 'error', error: err }]);
+      optionsRef.current.onError?.(err);
+    } finally {
+      setIsRunning(false);
+      loopRef.current = null;
+    }
+  }, []);
 
   const stop = useCallback(() => {
     loopRef.current?.abort();
