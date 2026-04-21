@@ -72,7 +72,6 @@ export class AgentLoop {
    * @param task - Natural language description of what the user wants done
    */
   async *run(task: string): AsyncGenerator<AgentEvent> {
-    this.aborted = false;
     let steps = 0;
     const history: AgentEvent[] = [];
 
