@@ -125,9 +125,9 @@ describe('TaskPlanner', () => {
 
       const planEvent = events.find((e) => e.type === 'plan');
       expect(planEvent).toBeDefined();
-      expect((planEvent as { subtasks: unknown[] }).subtasks).toHaveLength(3);
+      expect((planEvent as unknown as { subtasks: unknown[] }).subtasks).toHaveLength(3);
       expect(
-        (planEvent as { subtasks: Array<{ index: number; description: string }> }).subtasks[0],
+        (planEvent as unknown as { subtasks: Array<{ index: number; description: string }> }).subtasks[0],
       ).toEqual({ index: 0, description: 'Open the Clock app' });
     });
 
@@ -153,7 +153,7 @@ describe('TaskPlanner', () => {
       const completeEvents = events.filter((e) => e.type === 'subtask_complete');
       expect(completeEvents).toHaveLength(2);
       expect(
-        (completeEvents[0] as { result: string }).result,
+        (completeEvents[0] as unknown as { result: string }).result,
       ).toBe('subtask done');
     });
 
