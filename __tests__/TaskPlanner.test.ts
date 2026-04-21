@@ -166,7 +166,7 @@ describe('TaskPlanner', () => {
       const completeEvent = events.find((e) => e.type === 'complete');
       expect(completeEvent).toBeDefined();
       // Result should contain content from both subtasks
-      expect(typeof (completeEvent as { result: string }).result).toBe('string');
+      expect(typeof (completeEvent as unknown as { result: string }).result).toBe('string');
     });
 
     it('forwards agent_event entries for each subtask', async () => {
@@ -179,7 +179,7 @@ describe('TaskPlanner', () => {
       expect(agentEvents.length).toBeGreaterThan(0);
       // Each agent_event should reference the owning subtask
       for (const ae of agentEvents) {
-        expect((ae as { subtask: unknown }).subtask).toBeDefined();
+        expect((ae as unknown as { subtask: unknown }).subtask).toBeDefined();
       }
     });
   });
@@ -195,7 +195,7 @@ describe('TaskPlanner', () => {
 
       const planEvent = events.find((e) => e.type === 'plan');
       expect(
-        (planEvent as { subtasks: unknown[] }).subtasks,
+        (planEvent as unknown as { subtasks: unknown[] }).subtasks,
       ).toHaveLength(3);
     });
 
@@ -209,7 +209,7 @@ describe('TaskPlanner', () => {
 
       const planEvent = events.find((e) => e.type === 'plan');
       expect(
-        (planEvent as { subtasks: unknown[] }).subtasks,
+        (planEvent as unknown as { subtasks: unknown[] }).subtasks,
       ).toHaveLength(5);
     });
   });
@@ -226,7 +226,7 @@ describe('TaskPlanner', () => {
 
       const planEvent = events.find((e) => e.type === 'plan');
       expect(planEvent).toBeDefined();
-      const subtasks = (planEvent as { subtasks: Array<{ description: string }> }).subtasks;
+      const subtasks = (planEvent as unknown as { subtasks: Array<{ description: string }> }).subtasks;
       expect(subtasks).toHaveLength(1);
       expect(subtasks[0].description).toBe('My fallback task');
     });
@@ -258,7 +258,7 @@ describe('TaskPlanner', () => {
       const errorEvent = events.find((e) => e.type === 'error');
       expect(errorEvent).toBeDefined();
       expect(
-        (errorEvent as { error: Error }).error.message,
+        (errorEvent as unknown as { error: Error }).error.message,
       ).toBe('Decompose failed');
     });
 
