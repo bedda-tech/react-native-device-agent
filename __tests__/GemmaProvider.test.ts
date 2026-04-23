@@ -98,9 +98,11 @@ describe('GemmaProvider.generateWithTools', () => {
     await provider.generateWithTools('task', TOOLS);
 
     const prompt = generateFn.mock.calls[0][0] as string;
-    const parsed = JSON.parse(
-      prompt.match(/\[.*\]/s)?.[0] ?? '[]',
-    ) as Array<{ name: string; parameters: { required: string[] } }>;
+    // Extract only the tools JSON array — scoped between "Available tools:\n" and
+    // the blank line that follows it, so we don't accidentally capture the
+    // example lines later in the prompt that also contain "[" / "]".
+    const toolsJson = prompt.match(/Available tools:\n([\s\S]*?)\n\nTo call/)?.[1] ?? '[]';
+    const parsed = JSON.parse(toolsJson) as Array<{ name: string; parameters: { required: string[] } }>;
 
     const tap = parsed.find((t) => t.name === 'tap');
     expect(tap?.parameters.required).toEqual(['nodeId']);
