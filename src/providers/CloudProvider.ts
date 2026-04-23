@@ -31,29 +31,49 @@ export interface CloudProviderOptions {
    * Which API format to use.
    * - 'openai': OpenAI chat completions API (default)
    * - 'anthropic': Anthropic messages API
+   * - 'openrouter': OpenRouter — OpenAI-compatible but uses openrouter.ai base
+   *   URL and requires an HTTP-Referer header for rate-limit attribution.
    */
-  apiFormat?: 'openai' | 'anthropic';
+  apiFormat?: 'openai' | 'anthropic' | 'openrouter';
+  /**
+   * HTTP-Referer header value sent with OpenRouter requests.
+   * Required for rate-limit attribution; typically your app's GitHub URL.
+   * Only used when apiFormat is 'openrouter'.
+   */
+  referer?: string;
   /**
    * Optional system prompt injected into every API request.
    *
    * For Anthropic this maps to the top-level `system` field (recommended).
-   * For OpenAI it is prepended as a `role: 'system'` message.
+   * For OpenAI/OpenRouter it is prepended as a `role: 'system'` message.
    * Leave unset to use the model's default behaviour.
    */
   system?: string;
 }
 
 export class CloudProvider extends LLMProvider {
-  private options: Required<Omit<CloudProviderOptions, 'system'>> & { system: string | undefined };
+  private options: Required<Omit<CloudProviderOptions, 'system' | 'referer'>> & {
+    system: string | undefined;
+    referer: string | undefined;
+  };
 
   constructor(options: CloudProviderOptions) {
     super();
+    const format = options.apiFormat ?? 'openai';
+    // OpenRouter uses the OpenAI-compatible API but at a different base URL.
+    const defaultBaseUrl =
+      format === 'anthropic'
+        ? 'https://api.anthropic.com/v1'
+        : format === 'openrouter'
+          ? 'https://openrouter.ai/api/v1'
+          : 'https://api.openai.com/v1';
     this.options = {
-      baseUrl: 'https://api.openai.com/v1',
+      baseUrl: defaultBaseUrl,
       maxTokens: 1024,
       temperature: 0.7,
-      apiFormat: 'openai',
+      apiFormat: format,
       system: undefined,
+      referer: undefined,
       ...options,
     };
   }
@@ -73,6 +93,8 @@ export class CloudProvider extends LLMProvider {
    * For cloud providers we use native function calling when supported.
    * The raw text response (which may contain JSON tool calls) is returned
    * for ToolParser to process.
+   *
+   * OpenRouter uses the OpenAI-compatible path automatically.
    */
   async generateWithTools(prompt: string, tools: Tool[]): Promise<string> {
     return this.options.apiFormat === 'anthropic'
@@ -222,6 +244,7 @@ export class CloudProvider extends LLMProvider {
     extraHeaders: Record<string, string> = {},
   ): Promise<Record<string, unknown>> {
     const isAnthropic = this.options.apiFormat === 'anthropic';
+    const isOpenRouter = this.options.apiFormat === 'openrouter';
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -230,6 +253,10 @@ export class CloudProvider extends LLMProvider {
 
     if (!isAnthropic) {
       headers['Authorization'] = `Bearer ${this.options.apiKey}`;
+    }
+
+    if (isOpenRouter && this.options.referer) {
+      headers['HTTP-Referer'] = this.options.referer;
     }
 
     const res = await fetch(url, {

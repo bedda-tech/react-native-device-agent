@@ -49,7 +49,12 @@ function getController() {
  * task is complete or the step limit is reached.
  */
 export class AgentLoop {
-  private options: AgentOptions & { maxSteps: number; settleMs: number; useVision: boolean };
+  private options: AgentOptions & {
+    maxSteps: number;
+    settleMs: number;
+    useVision: boolean;
+    retryOnError: number;
+  };
   private aborted = false;
   private registry: ToolRegistry;
   private tools: Tool[];
@@ -59,6 +64,7 @@ export class AgentLoop {
       maxSteps: 20,
       settleMs: 500,
       useVision: false,
+      retryOnError: 0,
       ...options,
     };
     this.registry = new ToolRegistry();
@@ -89,19 +95,10 @@ export class AgentLoop {
       // Build the prompt
       const prompt = this.buildPrompt(task, screenState, history);
 
-      // LLM inference (vision or text-only)
+      // LLM inference (vision or text-only), with optional retry on failure.
       let response: string;
       try {
-        if (this.options.useVision && this.options.provider.generateWithVision) {
-          const screenshotPath = await this.captureScreenshot();
-          if (screenshotPath) {
-            response = await this.options.provider.generateWithVision(prompt, this.tools, screenshotPath);
-          } else {
-            response = await this.options.provider.generateWithTools(prompt, this.tools);
-          }
-        } else {
-          response = await this.options.provider.generateWithTools(prompt, this.tools);
-        }
+        response = await this.inferWithRetry(prompt);
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         yield { type: 'error', error };
@@ -210,6 +207,28 @@ export class AgentLoop {
     } catch {
       return null;
     }
+  }
+
+  private async inferWithRetry(prompt: string): Promise<string> {
+    const maxAttempts = 1 + this.options.retryOnError;
+    let lastError: Error = new Error('inference failed');
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) {
+        await this.delay(Math.pow(2, attempt - 1) * 500);
+      }
+      try {
+        if (this.options.useVision && this.options.provider.generateWithVision) {
+          const screenshotPath = await this.captureScreenshot();
+          if (screenshotPath) {
+            return await this.options.provider.generateWithVision(prompt, this.tools, screenshotPath);
+          }
+        }
+        return await this.options.provider.generateWithTools(prompt, this.tools);
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
+    }
+    throw lastError;
   }
 
   private buildPrompt(task: string, screenState: string, history: AgentEvent[]): string {

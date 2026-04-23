@@ -19,6 +19,12 @@ export interface AgentOptions {
    * Default: false.
    */
   useVision?: boolean;
+  /**
+   * Number of times to retry a failed LLM inference call before emitting an
+   * error event. Uses exponential backoff: attempt N waits 2^N * 500 ms.
+   * Default: 0 (no retries).
+   */
+  retryOnError?: number;
   /** Callback invoked on every action the agent takes. */
   onAction?: (action: AgentAction) => void;
   /** Callback invoked when the agent completes a task. */
