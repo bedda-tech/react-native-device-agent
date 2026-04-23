@@ -11,10 +11,11 @@ export interface UseAgentChatState {
   /**
    * Chat-style conversation history.
    *
-   * Each user command becomes a ChatMessage with role='user'.
-   * Agent steps (thinking, actions, screen observations) are folded into a
-   * streaming ChatMessage with role='agent' that updates as the loop runs.
-   * Errors become ChatMessages with role='system'.
+   * Each user command becomes a 'text' ChatMessage with role='user'.
+   * Agent tool calls become individual 'action' messages (green dot when done).
+   * Screen observations become 'screen' dividers between steps.
+   * Task completion becomes a 'text' bubble with the summary.
+   * Errors become 'text' messages with role='system'.
    */
   messages: ChatMessage[];
   /**
@@ -33,13 +34,17 @@ export interface UseAgentChatState {
  * React hook providing a chat-style interface over the agent loop.
  *
  * Unlike `useAgent` (which yields raw AgentEvents), `useAgentChat` presents
- * the session as a list of `ChatMessage` objects -- the same shape the Deft
- * chat UI renders directly.
+ * the session as a list of typed `ChatMessage` objects:
  *
- * User commands become role='user' messages immediately. Agent steps stream
- * into a single role='agent' message that grows as actions are executed. When
- * the task completes, the agent message is finalized with the summary. On
- * error, a role='system' message is appended.
+ *   - User commands      → role='user',   kind='text'   (chat bubble)
+ *   - Agent tool calls   → role='agent',  kind='action' (bullet with dot)
+ *   - Screen observations→ role='agent',  kind='screen' (divider)
+ *   - Task complete      → role='agent',  kind='text'   (chat bubble)
+ *   - Errors             → role='system', kind='text'
+ *
+ * The `pending` flag on 'action' messages is true while the loop is still
+ * running (grey dot) and false once the agent has moved past that step
+ * (green dot).
  *
  * @example
  * ```tsx
@@ -48,10 +53,7 @@ export interface UseAgentChatState {
  *   maxSteps: 20,
  * });
  *
- * // Render messages
  * messages.map((m) => <ChatBubble key={m.timestamp} message={m} />)
- *
- * // Send a command
  * await sendMessage('Open Settings and enable Wi-Fi');
  * ```
  */
@@ -60,8 +62,6 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const loopRef = useRef<AgentLoop | null>(null);
 
-  // Refs keep options/isRunning accessible inside stable callbacks without
-  // causing them to be recreated on every render.
   const optionsRef = useRef(options);
   useEffect(() => {
     optionsRef.current = options;
@@ -72,22 +72,23 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
     setMessages((prev) => [...prev, msg]);
   }, []);
 
-  const updateLastAgentMessage = useCallback((content: string) => {
+  // Mark the most recent 'action' message as no longer pending.
+  const resolveLastAction = useCallback(() => {
     setMessages((prev) => {
-      const lastIdx = prev.length - 1;
-      if (lastIdx >= 0 && prev[lastIdx].role === 'agent') {
-        const updated = { ...prev[lastIdx], content };
-        return [...prev.slice(0, lastIdx), updated];
+      for (let i = prev.length - 1; i >= 0; i--) {
+        if (prev[i].kind === 'action' && prev[i].pending) {
+          const updated = { ...prev[i], pending: false };
+          return [...prev.slice(0, i), updated, ...prev.slice(i + 1)];
+        }
       }
-      const newMsg: ChatMessage = { role: 'agent', content, timestamp: Date.now() };
-      return [...prev, newMsg];
+      return prev;
     });
   }, []);
 
   const sendMessage = useCallback(async (text: string) => {
     if (isRunningRef.current) return;
 
-    appendMessage({ role: 'user', content: text, timestamp: Date.now() });
+    appendMessage({ role: 'user', text, kind: 'text', timestamp: Date.now() });
 
     isRunningRef.current = true;
     setIsRunning(true);
@@ -95,57 +96,89 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
     const loop = new AgentLoop(optionsRef.current);
     loopRef.current = loop;
 
-    const lines: string[] = [];
-
     try {
       for await (const event of loop.run(text)) {
         switch (event.type) {
           case 'thinking':
-            lines.push(`\u2026 ${event.content}`);
-            updateLastAgentMessage(lines.join('\n'));
+            // Thinking is internal — no visual message; callers can use onAction.
             break;
 
           case 'action':
-            lines.push(`\u25b6 ${event.tool}(${formatArgs(event.args)})`);
-            updateLastAgentMessage(lines.join('\n'));
-            optionsRef.current.onAction?.({ tool: event.tool, args: event.args, timestamp: Date.now() });
+            // Resolve the previous pending action (if any) before adding the new one.
+            resolveLastAction();
+            appendMessage({
+              role: 'agent',
+              text: `${event.tool}(${formatArgs(event.args)})`,
+              kind: 'action',
+              pending: true,
+              timestamp: Date.now(),
+            });
+            optionsRef.current.onAction?.({
+              tool: event.tool,
+              args: event.args,
+              timestamp: Date.now(),
+            });
             break;
 
           case 'observation':
-            lines.push(`\u25a0 Step ${event.step}: observed screen`);
-            updateLastAgentMessage(lines.join('\n'));
+            resolveLastAction();
+            appendMessage({
+              role: 'agent',
+              text: `Step ${event.step}`,
+              kind: 'screen',
+              timestamp: Date.now(),
+            });
             break;
 
           case 'complete':
-            updateLastAgentMessage(event.result);
+            resolveLastAction();
+            appendMessage({
+              role: 'agent',
+              text: event.result,
+              kind: 'text',
+              timestamp: Date.now(),
+            });
             optionsRef.current.onComplete?.(event.result);
             break;
 
           case 'max_steps_reached':
-            updateLastAgentMessage(
-              lines.length > 0
-                ? `${lines.join('\n')}\n\u26a0 Max steps reached without completing the task.`
-                : 'Max steps reached without completing the task.',
-            );
+            resolveLastAction();
+            appendMessage({
+              role: 'system',
+              text: 'Max steps reached without completing the task.',
+              kind: 'text',
+              timestamp: Date.now(),
+            });
             break;
 
           case 'error':
-            lines.push(`\u274c ${event.error.message}`);
-            updateLastAgentMessage(lines.join('\n'));
+            resolveLastAction();
+            appendMessage({
+              role: 'system',
+              text: `Agent error: ${event.error.message}`,
+              kind: 'text',
+              timestamp: Date.now(),
+            });
             optionsRef.current.onError?.(event.error);
             break;
         }
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
-      appendMessage({ role: 'system', content: `Agent error: ${error.message}`, timestamp: Date.now() });
+      resolveLastAction();
+      appendMessage({
+        role: 'system',
+        text: `Agent error: ${error.message}`,
+        kind: 'text',
+        timestamp: Date.now(),
+      });
       optionsRef.current.onError?.(error);
     } finally {
       isRunningRef.current = false;
       setIsRunning(false);
       loopRef.current = null;
     }
-  }, [appendMessage, updateLastAgentMessage]);
+  }, [appendMessage, resolveLastAction]);
 
   const stop = useCallback(() => {
     loopRef.current?.abort();
@@ -162,17 +195,12 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Compact display format for tool arguments in the chat log.
- * Short values are shown inline; large objects are truncated.
- */
 function formatArgs(args: Record<string, unknown>): string {
   const entries = Object.entries(args);
   if (entries.length === 0) return '';
 
   const parts = entries.map(([k, v]) => {
     const str = JSON.stringify(v);
-    // Truncate long strings so the chat log stays readable
     return `${k}: ${str.length > 40 ? `${str.slice(0, 37)}...` : str}`;
   });
 

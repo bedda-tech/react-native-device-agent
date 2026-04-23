@@ -13,6 +13,7 @@ export type {
   LLMProviderInterface,
   UseAgentState,
   ChatMessage,
+  ChatMessageKind,
 } from './types';
 
 // ---------------------------------------------------------------------------

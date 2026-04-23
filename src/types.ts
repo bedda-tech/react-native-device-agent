@@ -125,11 +125,32 @@ export interface UseAgentState {
 }
 
 /**
+ * Visual kind of a chat message — controls how the UI renders it.
+ *
+ *   'text'   — standard chat bubble (user commands, agent summaries, errors)
+ *   'action' — action bullet with a status dot (agent tool calls)
+ *   'screen' — horizontal divider labelling a screen observation step
+ */
+export type ChatMessageKind = 'text' | 'action' | 'screen';
+
+/**
  * Chat message in the agent conversation.
  */
 export interface ChatMessage {
   role: 'user' | 'agent' | 'system';
-  content: string;
+  /** Display text for the message. */
+  text: string;
+  /**
+   * Visual kind. Defaults to 'text' when absent.
+   * - 'text'   → standard bubble
+   * - 'action' → action bullet with status dot
+   * - 'screen' → horizontal divider showing observation step
+   */
+  kind?: ChatMessageKind;
+  /**
+   * True while an action is still in-flight (dot is grey).
+   * False (or absent) once the loop has moved past this action (dot is green).
+   */
+  pending?: boolean;
   timestamp: number;
-  action?: AgentAction;
 }
