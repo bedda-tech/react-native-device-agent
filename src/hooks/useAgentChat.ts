@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AgentOptions, ChatMessage } from '../types';
 import { AgentLoop } from '../agent/AgentLoop';
 
+let _msgCounter = 0;
+function nextId(): string {
+  return `${Date.now()}-${++_msgCounter}`;
+}
+
 /**
  * State returned by the useAgentChat hook.
  */
@@ -88,7 +93,7 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
   const sendMessage = useCallback(async (text: string) => {
     if (isRunningRef.current) return;
 
-    appendMessage({ role: 'user', text, kind: 'text', timestamp: Date.now() });
+    appendMessage({ id: nextId(), role: 'user', text, kind: 'text', timestamp: Date.now() });
 
     isRunningRef.current = true;
     setIsRunning(true);
@@ -107,6 +112,7 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
             // Resolve the previous pending action (if any) before adding the new one.
             resolveLastAction();
             appendMessage({
+              id: nextId(),
               role: 'agent',
               text: `${event.tool}(${formatArgs(event.args)})`,
               kind: 'action',
@@ -123,6 +129,7 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
           case 'observation':
             resolveLastAction();
             appendMessage({
+              id: nextId(),
               role: 'agent',
               text: `Step ${event.step}`,
               kind: 'screen',
@@ -133,6 +140,7 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
           case 'complete':
             resolveLastAction();
             appendMessage({
+              id: nextId(),
               role: 'agent',
               text: event.result,
               kind: 'text',
@@ -144,6 +152,7 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
           case 'max_steps_reached':
             resolveLastAction();
             appendMessage({
+              id: nextId(),
               role: 'system',
               text: 'Max steps reached without completing the task.',
               kind: 'text',
@@ -154,6 +163,7 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
           case 'error':
             resolveLastAction();
             appendMessage({
+              id: nextId(),
               role: 'system',
               text: `Agent error: ${event.error.message}`,
               kind: 'text',
@@ -167,6 +177,7 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
       const error = err instanceof Error ? err : new Error(String(err));
       resolveLastAction();
       appendMessage({
+        id: nextId(),
         role: 'system',
         text: `Agent error: ${error.message}`,
         kind: 'text',

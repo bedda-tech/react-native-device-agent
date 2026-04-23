@@ -137,6 +137,8 @@ export type ChatMessageKind = 'text' | 'action' | 'screen';
  * Chat message in the agent conversation.
  */
 export interface ChatMessage {
+  /** Unique identifier for this message. */
+  id: string;
   role: 'user' | 'agent' | 'system';
   /** Display text for the message. */
   text: string;
