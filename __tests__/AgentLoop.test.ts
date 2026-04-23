@@ -290,6 +290,110 @@ describe('AgentLoop', () => {
     });
   });
 
+  describe('retryOnError', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    /** Helper: runs the agent loop while also advancing fake timers so delays
+     *  inside inferWithRetry don't block the test. */
+    async function collectWithTimers(loop: AgentLoop, task: string): Promise<AgentEvent[]> {
+      const events: AgentEvent[] = [];
+      const gen = loop.run(task);
+      let done = false;
+      while (!done) {
+        const nextPromise = gen.next();
+        await jest.runAllTimersAsync();
+        const result = await nextPromise;
+        if (result.done) {
+          done = true;
+        } else {
+          events.push(result.value);
+        }
+      }
+      return events;
+    }
+
+    it('retries once and succeeds when retryOnError=1 and first call fails', async () => {
+      let calls = 0;
+      const flakeyProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          calls++;
+          if (calls === 1) throw new Error('transient failure');
+          return `{"name":"task_complete","arguments":{"summary":"recovered"}}`;
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider: flakeyProvider,
+        maxSteps: 5,
+        settleMs: 0,
+        retryOnError: 1,
+      });
+
+      const events = await collectWithTimers(loop, 'Retry once');
+
+      expect(calls).toBe(2);
+      const complete = events.find((e) => e.type === 'complete');
+      expect(complete).toBeDefined();
+      expect((complete as { type: 'complete'; result: string }).result).toBe('recovered');
+    });
+
+    it('emits error when provider fails more times than retryOnError allows', async () => {
+      let calls = 0;
+      const alwaysFailsProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          calls++;
+          throw new Error(`failure #${calls}`);
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider: alwaysFailsProvider,
+        maxSteps: 5,
+        settleMs: 0,
+        retryOnError: 2,
+      });
+
+      const events = await collectWithTimers(loop, 'All retries exhausted');
+
+      expect(calls).toBe(3);
+      const error = events.find((e) => e.type === 'error');
+      expect(error).toBeDefined();
+      expect((error as { type: 'error'; error: Error }).error.message).toBe('failure #3');
+    });
+
+    it('does not retry when retryOnError=0 (default)', async () => {
+      let calls = 0;
+      const failOnceProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          calls++;
+          throw new Error('no retry');
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider: failOnceProvider,
+        maxSteps: 3,
+        settleMs: 0,
+        retryOnError: 0,
+      });
+
+      const events = await collectWithTimers(loop, 'No retry');
+
+      expect(calls).toBe(1);
+      const error = events.find((e) => e.type === 'error');
+      expect(error).toBeDefined();
+    });
+  });
+
   describe('thinking extraction', () => {
     it('emits a thinking event when the provider prefixes the tool call with text', async () => {
       let call = 0;

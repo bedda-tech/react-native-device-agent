@@ -221,6 +221,102 @@ describe('CloudProvider (Anthropic format)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// OpenRouter format
+// ---------------------------------------------------------------------------
+
+describe('CloudProvider (OpenRouter format)', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test('defaults to openrouter.ai/api/v1 base URL', async () => {
+    const provider = new CloudProvider({
+      apiKey: 'or-test-key',
+      model: 'anthropic/claude-sonnet-4-6',
+      apiFormat: 'openrouter',
+    });
+    global.fetch = makeFetchMock({
+      choices: [{ message: { content: 'ok' } }],
+    });
+
+    await provider.generate('hi');
+    const [url] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toContain('openrouter.ai/api/v1');
+    expect(url).toContain('/chat/completions');
+  });
+
+  test('uses Bearer auth like OpenAI', async () => {
+    const provider = new CloudProvider({
+      apiKey: 'or-key-123',
+      model: 'anthropic/claude-sonnet-4-6',
+      apiFormat: 'openrouter',
+    });
+    global.fetch = makeFetchMock({
+      choices: [{ message: { content: 'hello' } }],
+    });
+
+    await provider.generate('test');
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(init.headers['Authorization']).toBe('Bearer or-key-123');
+    expect(init.headers['x-api-key']).toBeUndefined();
+  });
+
+  test('sends HTTP-Referer header when referer is provided', async () => {
+    const provider = new CloudProvider({
+      apiKey: 'or-key',
+      model: 'anthropic/claude-sonnet-4-6',
+      apiFormat: 'openrouter',
+      referer: 'https://github.com/bedda-tech/deft',
+    });
+    global.fetch = makeFetchMock({
+      choices: [{ message: { content: 'ok' } }],
+    });
+
+    await provider.generate('test');
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(init.headers['HTTP-Referer']).toBe('https://github.com/bedda-tech/deft');
+  });
+
+  test('omits HTTP-Referer when referer is not provided', async () => {
+    const provider = new CloudProvider({
+      apiKey: 'or-key',
+      model: 'anthropic/claude-sonnet-4-6',
+      apiFormat: 'openrouter',
+    });
+    global.fetch = makeFetchMock({
+      choices: [{ message: { content: 'ok' } }],
+    });
+
+    await provider.generate('test');
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(init.headers['HTTP-Referer']).toBeUndefined();
+  });
+
+  test('generateWithTools() serializes native tool_calls (same as OpenAI path)', async () => {
+    const provider = new CloudProvider({
+      apiKey: 'or-key',
+      model: 'anthropic/claude-sonnet-4-6',
+      apiFormat: 'openrouter',
+    });
+    global.fetch = makeFetchMock({
+      choices: [
+        {
+          message: {
+            tool_calls: [
+              { function: { name: 'tap', arguments: JSON.stringify({ nodeId: 'n1' }) } },
+            ],
+          },
+        },
+      ],
+    });
+
+    const result = await provider.generateWithTools('tap it', [SAMPLE_TOOL]);
+    const parsed = JSON.parse(result);
+    expect(parsed[0]).toEqual({ name: 'tap', arguments: { nodeId: 'n1' } });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Default options
 // ---------------------------------------------------------------------------
 
