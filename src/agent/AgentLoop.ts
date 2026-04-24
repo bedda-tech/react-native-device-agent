@@ -235,7 +235,7 @@ export class AgentLoop {
 
   private buildPrompt(task: string, screenState: string, history: AgentEvent[]): string {
     const historyText = this.formatHistory(history);
-    const suffix = this.options.systemPromptSuffix.trim();
+    const suffix = (this.options.systemPromptSuffix ?? '').trim();
 
     return [
       `Task: ${task}`,
