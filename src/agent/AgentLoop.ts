@@ -147,6 +147,15 @@ export class AgentLoop {
           return;
         }
 
+        if (call.name === 'task_failed') {
+          const reason = (call.arguments.reason as string) ?? 'Task failed.';
+          const failedEvent: AgentEvent = { type: 'failed', reason };
+          history.push(failedEvent);
+          yield failedEvent;
+          this.options.onFailed?.(reason);
+          return;
+        }
+
         // Emit action event before execution so the UI can show in-flight state.
         // We hold a mutable reference so we can backfill result after execution.
         const actionEvent: Extract<AgentEvent, { type: 'action' }> = {
@@ -367,6 +376,18 @@ export class AgentLoop {
       return this.readScreen();
     });
 
+    this.registry.register(phoneTool('find_node'), async (args) => {
+      const ctrl = getController();
+      const tree = await ctrl.getAccessibilityTree();
+      return findNodeInTree(tree, {
+        text: args.text !== undefined ? String(args.text) : undefined,
+        contentDescription: args.contentDescription !== undefined
+          ? String(args.contentDescription)
+          : undefined,
+        className: args.className !== undefined ? String(args.className) : undefined,
+      });
+    });
+
     this.registry.register(phoneTool('screenshot'), async () => {
       const ctrl = getController();
       return ctrl.takeScreenshot();
@@ -383,9 +404,10 @@ export class AgentLoop {
       return true;
     });
 
-    // task_complete is handled specially in the loop, but register a no-op
-    // so registry.has('task_complete') returns true.
+    // task_complete and task_failed are handled specially in the loop, but
+    // register no-ops so registry.has() returns true for both.
     this.registry.register(phoneTool('task_complete'), async () => true);
+    this.registry.register(phoneTool('task_failed'), async () => true);
   }
 }
 
@@ -405,6 +427,46 @@ function formatToolResult(result: unknown): string {
   // Strings (e.g. read_screen content) are too long to inline; just note they succeeded.
   if (typeof result === 'string') return result.length > 0 ? ' → ok' : ' → empty';
   return ` → ${String(result)}`;
+}
+
+/**
+ * Recursively search an accessibility tree for the first node matching the query.
+ * Supports both array-of-roots and single-root tree shapes.
+ * Returns the nodeId of the matching node, or null if not found.
+ */
+function findNodeInTree(
+  tree: unknown,
+  query: { text?: string; contentDescription?: string; className?: string },
+): string | null {
+  const roots = Array.isArray(tree) ? tree : [tree];
+  return searchNodes(roots as Record<string, unknown>[], query);
+}
+
+function searchNodes(
+  nodes: Record<string, unknown>[],
+  query: { text?: string; contentDescription?: string; className?: string },
+): string | null {
+  for (const node of nodes) {
+    const nodeText = typeof node.text === 'string' ? node.text : null;
+    const nodeDesc = typeof node.contentDescription === 'string' ? node.contentDescription : null;
+    const nodeCls = typeof node.className === 'string' ? node.className : null;
+
+    const matches =
+      (query.text !== undefined && nodeText !== null && nodeText.includes(query.text)) ||
+      (query.contentDescription !== undefined && nodeDesc !== null && nodeDesc.includes(query.contentDescription)) ||
+      (query.className !== undefined && nodeCls === query.className);
+
+    if (matches) {
+      return typeof node.nodeId === 'string' ? node.nodeId : null;
+    }
+
+    const children = Array.isArray(node.children)
+      ? (node.children as Record<string, unknown>[])
+      : [];
+    const found = searchNodes(children, query);
+    if (found) return found;
+  }
+  return null;
 }
 
 /**

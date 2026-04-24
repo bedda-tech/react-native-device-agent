@@ -42,6 +42,8 @@ export interface AgentOptions {
   onAction?: (action: AgentAction) => void;
   /** Callback invoked when the agent completes a task. */
   onComplete?: (result: string) => void;
+  /** Callback invoked when the agent explicitly fails a task via task_failed. */
+  onFailed?: (reason: string) => void;
   /** Callback invoked on error. */
   onError?: (error: Error) => void;
 }
@@ -64,6 +66,7 @@ export type AgentEvent =
   | { type: 'observation'; screenState: string; step: number; screenshotPath?: string }
   | { type: 'thinking'; content: string }
   | { type: 'complete'; result: string }
+  | { type: 'failed'; reason: string }
   | { type: 'error'; error: Error }
   | { type: 'max_steps_reached' };
 

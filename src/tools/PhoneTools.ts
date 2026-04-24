@@ -130,6 +130,18 @@ export const PHONE_TOOLS: Tool[] = [
     },
   },
   {
+    name: 'find_node',
+    description: 'Search the accessibility tree for a node by text, content description, or class name. Returns the nodeId of the first match, or null if not found. Use this before tapping to verify a node exists and get its ID.',
+    parameters: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Substring to match against node text (case-sensitive)' },
+        contentDescription: { type: 'string', description: 'Substring to match against node content description' },
+        className: { type: 'string', description: 'Exact class name to match (e.g. android.widget.Button)' },
+      },
+    },
+  },
+  {
     name: 'task_complete',
     description: 'Signal that the task has been completed successfully',
     parameters: {
@@ -138,6 +150,17 @@ export const PHONE_TOOLS: Tool[] = [
         summary: { type: 'string', description: 'Brief summary of what was accomplished' },
       },
       required: ['summary'],
+    },
+  },
+  {
+    name: 'task_failed',
+    description: 'Signal that the task cannot be completed. Use this when the task is impossible, blocked, or requires unavailable permissions. Prefer this over running until the step limit.',
+    parameters: {
+      type: 'object',
+      properties: {
+        reason: { type: 'string', description: 'Explanation of why the task failed or is impossible' },
+      },
+      required: ['reason'],
     },
   },
 ];

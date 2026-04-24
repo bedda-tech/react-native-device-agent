@@ -761,6 +761,117 @@ describe('AgentLoop', () => {
     });
   });
 
+  describe('task_failed', () => {
+    it('emits a failed event with the reason and exits the loop', async () => {
+      const failingProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          return '{"name":"task_failed","arguments":{"reason":"Element not found on screen"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider: failingProvider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'tap missing button');
+
+      const failedEvent = events.find((e) => e.type === 'failed') as
+        Extract<AgentEvent, { type: 'failed' }> | undefined;
+      expect(failedEvent).toBeDefined();
+      expect(failedEvent!.reason).toBe('Element not found on screen');
+    });
+
+    it('does not emit max_steps_reached when task_failed is called', async () => {
+      const failingProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          return '{"name":"task_failed","arguments":{"reason":"blocked"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider: failingProvider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'impossible task');
+
+      expect(events.some((e) => e.type === 'max_steps_reached')).toBe(false);
+    });
+
+    it('invokes onFailed callback with the reason', async () => {
+      const onFailed = jest.fn();
+      const failingProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          return '{"name":"task_failed","arguments":{"reason":"cannot proceed"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider: failingProvider, maxSteps: 5, settleMs: 0, onFailed });
+      await collectEvents(loop, 'test onFailed callback');
+
+      expect(onFailed).toHaveBeenCalledTimes(1);
+      expect(onFailed).toHaveBeenCalledWith('cannot proceed');
+    });
+  });
+
+  describe('find_node tool', () => {
+    it('returns the nodeId of a matching node via text search', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue([
+        {
+          nodeId: 'root',
+          text: null,
+          contentDescription: null,
+          className: 'FrameLayout',
+          children: [
+            { nodeId: 'btn-settings', text: 'Settings', contentDescription: null, className: 'TextView', children: [] },
+          ],
+        },
+      ]);
+
+      let findResult: unknown;
+      let call = 0;
+      const capturingProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"find_node","arguments":{"text":"Settings"}}';
+          return '{"name":"task_complete","arguments":{"summary":"found"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider: capturingProvider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'find Settings node');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'find_node',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      findResult = action!.result;
+      expect(findResult).toBe('btn-settings');
+    });
+
+    it('returns null when no node matches the query', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue([
+        { nodeId: 'root', text: 'Home', contentDescription: null, className: 'FrameLayout', children: [] },
+      ]);
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"find_node","arguments":{"text":"NonExistent"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'find missing node');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'find_node',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBeNull();
+    });
+  });
+
   describe('thinking extraction', () => {
     it('emits a thinking event when the provider prefixes the tool call with text', async () => {
       let call = 0;

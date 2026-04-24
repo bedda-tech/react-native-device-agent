@@ -50,7 +50,9 @@ describe('PHONE_TOOLS', () => {
       'screenshot',
       'global_action',
       'wait',
+      'find_node',
       'task_complete',
+      'task_failed',
     ];
     for (const name of expected) {
       expect(PHONE_TOOLS.some((t) => t.name === name)).toBe(true);
@@ -158,5 +160,23 @@ describe('read_screen and screenshot tools', () => {
   test('screenshot has no required parameters', () => {
     const tool = getTool('screenshot');
     expect(tool.parameters.required ?? []).toHaveLength(0);
+  });
+});
+
+describe('find_node tool', () => {
+  test('has text, contentDescription, and className — all optional', () => {
+    const tool = getTool('find_node');
+    expect(tool.parameters.properties.text?.type).toBe('string');
+    expect(tool.parameters.properties.contentDescription?.type).toBe('string');
+    expect(tool.parameters.properties.className?.type).toBe('string');
+    expect(tool.parameters.required).toBeUndefined();
+  });
+});
+
+describe('task_failed tool', () => {
+  test('requires reason', () => {
+    const tool = getTool('task_failed');
+    expect(tool.parameters.required).toContain('reason');
+    expect(tool.parameters.properties.reason?.type).toBe('string');
   });
 });
