@@ -54,6 +54,7 @@ export class AgentLoop {
     settleMs: number;
     useVision: boolean;
     retryOnError: number;
+    systemPromptSuffix: string;
   };
   private aborted = false;
   private registry: ToolRegistry;
@@ -65,6 +66,7 @@ export class AgentLoop {
       settleMs: 500,
       useVision: false,
       retryOnError: 0,
+      systemPromptSuffix: '',
       ...options,
     };
     this.registry = new ToolRegistry();
@@ -233,6 +235,7 @@ export class AgentLoop {
 
   private buildPrompt(task: string, screenState: string, history: AgentEvent[]): string {
     const historyText = this.formatHistory(history);
+    const suffix = this.options.systemPromptSuffix.trim();
 
     return [
       `Task: ${task}`,
@@ -240,6 +243,7 @@ export class AgentLoop {
       'Current screen:',
       screenState,
       historyText ? `\nAction history:\n${historyText}` : '',
+      suffix ? `\nAdditional instructions:\n${suffix}` : '',
       '',
       'What is the next action to take? Respond with a tool call.',
     ]

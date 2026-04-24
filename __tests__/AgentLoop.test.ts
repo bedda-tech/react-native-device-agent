@@ -394,6 +394,53 @@ describe('AgentLoop', () => {
     });
   });
 
+  describe('systemPromptSuffix', () => {
+    it('appends suffix text to the prompt passed to the provider', async () => {
+      const capturedPrompts: string[] = [];
+      const capturingProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(prompt: string): Promise<string> {
+          capturedPrompts.push(prompt);
+          return `{"name":"task_complete","arguments":{"summary":"done"}}`;
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider: capturingProvider,
+        maxSteps: 5,
+        settleMs: 0,
+        systemPromptSuffix: 'Always use nodeId, never coordinates.',
+      });
+
+      await collectEvents(loop, 'Test suffix injection');
+
+      expect(capturedPrompts.length).toBeGreaterThan(0);
+      expect(capturedPrompts[0]).toContain('Always use nodeId, never coordinates.');
+    });
+
+    it('does not add additional instructions section when suffix is empty', async () => {
+      const capturedPrompts: string[] = [];
+      const capturingProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(prompt: string): Promise<string> {
+          capturedPrompts.push(prompt);
+          return `{"name":"task_complete","arguments":{"summary":"done"}}`;
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider: capturingProvider,
+        maxSteps: 5,
+        settleMs: 0,
+        systemPromptSuffix: '',
+      });
+
+      await collectEvents(loop, 'Test no suffix');
+
+      expect(capturedPrompts[0]).not.toContain('Additional instructions');
+    });
+  });
+
   describe('thinking extraction', () => {
     it('emits a thinking event when the provider prefixes the tool call with text', async () => {
       let call = 0;

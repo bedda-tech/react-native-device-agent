@@ -25,6 +25,12 @@ export interface AgentOptions {
    * Default: 0 (no retries).
    */
   retryOnError?: number;
+  /**
+   * Additional instructions appended to the system/task prompt on every step.
+   * Applies to all providers, including on-device GemmaProvider.
+   * Use this to pass user-defined custom instructions into the agent.
+   */
+  systemPromptSuffix?: string;
   /** Callback invoked on every action the agent takes. */
   onAction?: (action: AgentAction) => void;
   /** Callback invoked when the agent completes a task. */
