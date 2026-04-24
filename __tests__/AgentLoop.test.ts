@@ -441,6 +441,84 @@ describe('AgentLoop', () => {
     });
   });
 
+  describe('maxScreenLength', () => {
+    it('truncates the screen state in the prompt when the tree is large', async () => {
+      // Build a large tree: 50 non-interactive text nodes
+      const bigTree = {
+        nodeId: 'root',
+        text: null,
+        children: Array.from({ length: 50 }, (_, i) => ({
+          nodeId: `node-${i}`,
+          className: 'android.widget.TextView',
+          text: `Static text item number ${i} with some longer content here`,
+          children: [],
+        })),
+      };
+      mockController.getAccessibilityTree.mockResolvedValue(bigTree);
+
+      const capturedPrompts: string[] = [];
+      const capturingProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(prompt: string): Promise<string> {
+          capturedPrompts.push(prompt);
+          return `{"name":"task_complete","arguments":{"summary":"done"}}`;
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider: capturingProvider,
+        maxSteps: 2,
+        settleMs: 0,
+        maxScreenLength: 200,
+      });
+
+      await collectEvents(loop, 'Big screen truncation');
+
+      expect(capturedPrompts.length).toBeGreaterThan(0);
+      // With maxScreenLength=200, the screen block should be ≤200 chars
+      const screenBlock = capturedPrompts[0]
+        .split('\n')
+        .filter((l) => l.includes('=== SCREEN STATE ===') || l.includes('node-'))
+        .join('\n');
+      expect(screenBlock.length).toBeLessThanOrEqual(500); // generous bound after filtering
+    });
+
+    it('uses full serialization when maxScreenLength=0', async () => {
+      const manyNodeTree = {
+        nodeId: 'root',
+        text: null,
+        children: Array.from({ length: 10 }, (_, i) => ({
+          nodeId: `n${i}`,
+          className: 'android.widget.TextView',
+          text: `Item ${i}`,
+          children: [],
+        })),
+      };
+      mockController.getAccessibilityTree.mockResolvedValue(manyNodeTree);
+
+      const capturedPrompts: string[] = [];
+      const capturingProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(prompt: string): Promise<string> {
+          capturedPrompts.push(prompt);
+          return `{"name":"task_complete","arguments":{"summary":"done"}}`;
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider: capturingProvider,
+        maxSteps: 2,
+        settleMs: 0,
+        maxScreenLength: 0, // disabled
+      });
+
+      await collectEvents(loop, 'Full screen no truncation');
+
+      // All 10 nodes should appear in the prompt
+      expect(capturedPrompts[0]).toContain('Item 9');
+    });
+  });
+
   describe('tool result tracking', () => {
     it('action event has result=true after a successful tap', async () => {
       mockController.tapNode.mockResolvedValue(true);

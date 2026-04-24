@@ -31,6 +31,13 @@ export interface AgentOptions {
    * Use this to pass user-defined custom instructions into the agent.
    */
   systemPromptSuffix?: string;
+  /**
+   * Maximum character length of the serialized screen state included in each
+   * prompt. When the full accessibility tree exceeds this limit, only clickable,
+   * editable, scrollable, and focused nodes are kept. Default: 6000 characters.
+   * Set to 0 to disable truncation (not recommended for complex screens).
+   */
+  maxScreenLength?: number;
   /** Callback invoked on every action the agent takes. */
   onAction?: (action: AgentAction) => void;
   /** Callback invoked when the agent completes a task. */

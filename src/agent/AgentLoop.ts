@@ -55,6 +55,7 @@ export class AgentLoop {
     useVision: boolean;
     retryOnError: number;
     systemPromptSuffix: string;
+    maxScreenLength: number;
   };
   private aborted = false;
   private registry: ToolRegistry;
@@ -67,6 +68,7 @@ export class AgentLoop {
       useVision: false,
       retryOnError: 0,
       systemPromptSuffix: '',
+      maxScreenLength: 6000,
       ...options,
     };
     this.registry = new ToolRegistry();
@@ -205,7 +207,10 @@ export class AgentLoop {
   private async readScreen(): Promise<string> {
     const ctrl = getController();
     const tree = await ctrl.getAccessibilityTree();
-    return ScreenSerializer.serialize(tree);
+    const maxLen = this.options.maxScreenLength;
+    return maxLen > 0
+      ? ScreenSerializer.summarize(tree, maxLen)
+      : ScreenSerializer.serialize(tree);
   }
 
   private async captureScreenshot(): Promise<string | null> {
