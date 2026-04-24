@@ -41,6 +41,7 @@ describe('PHONE_TOOLS', () => {
   test('includes all expected tools', () => {
     const expected = [
       'tap',
+      'long_press',
       'type_text',
       'swipe',
       'scroll',
@@ -64,6 +65,16 @@ describe('PHONE_TOOLS', () => {
 describe('tap tool', () => {
   test('has nodeId, x, y properties — all optional', () => {
     const tool = getTool('tap');
+    expect(tool.parameters.properties.nodeId?.type).toBe('string');
+    expect(tool.parameters.properties.x?.type).toBe('number');
+    expect(tool.parameters.properties.y?.type).toBe('number');
+    expect(tool.parameters.required).toBeUndefined();
+  });
+});
+
+describe('long_press tool', () => {
+  test('has nodeId, x, y properties — all optional', () => {
+    const tool = getTool('long_press');
     expect(tool.parameters.properties.nodeId?.type).toBe('string');
     expect(tool.parameters.properties.x?.type).toBe('number');
     expect(tool.parameters.properties.y?.type).toBe('number');

@@ -11,6 +11,8 @@ let AccessibilityController: {
   getAccessibilityTree: () => Promise<unknown>;
   tapNode: (nodeId: string) => Promise<boolean>;
   tap: (x: number, y: number) => Promise<boolean>;
+  longPressNode: (nodeId: string) => Promise<boolean>;
+  longPress: (x: number, y: number) => Promise<boolean>;
   setNodeText: (nodeId: string, text: string) => Promise<boolean>;
   swipe: (
     startX: number,
@@ -92,6 +94,7 @@ export class AgentLoop {
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       yield { type: 'error', error };
+      this.options.onError?.(error);
       return;
     }
 
@@ -106,6 +109,7 @@ export class AgentLoop {
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         yield { type: 'error', error };
+        this.options.onError?.(error);
         return;
       }
 
@@ -139,6 +143,7 @@ export class AgentLoop {
           const completeEvent: AgentEvent = { type: 'complete', result };
           history.push(completeEvent);
           yield completeEvent;
+          this.options.onComplete?.(result);
           return;
         }
 
@@ -151,6 +156,7 @@ export class AgentLoop {
         };
         history.push(actionEvent);
         yield actionEvent;
+        this.options.onAction?.({ tool: call.name, args: call.arguments, timestamp: Date.now() });
 
         // Execute the action and record the result on the history entry so
         // formatHistory() can annotate success / failure in the next prompt.
@@ -162,6 +168,7 @@ export class AgentLoop {
           const errEvent: AgentEvent = { type: 'error', error };
           history.push(errEvent);
           yield errEvent;
+          this.options.onError?.(error);
           // Continue to next step rather than aborting on action failure
         }
 
@@ -181,6 +188,7 @@ export class AgentLoop {
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         yield { type: 'error', error };
+        this.options.onError?.(error);
         return;
       }
 
@@ -308,6 +316,16 @@ export class AgentLoop {
       const x = Number(args.x ?? 0);
       const y = Number(args.y ?? 0);
       return ctrl.tap(x, y);
+    });
+
+    this.registry.register(phoneTool('long_press'), async (args) => {
+      const ctrl = getController();
+      if (typeof args.nodeId === 'string' && args.nodeId) {
+        return ctrl.longPressNode(args.nodeId);
+      }
+      const x = Number(args.x ?? 0);
+      const y = Number(args.y ?? 0);
+      return ctrl.longPress(x, y);
     });
 
     this.registry.register(phoneTool('type_text'), async (args) => {

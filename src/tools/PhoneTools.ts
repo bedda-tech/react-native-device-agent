@@ -20,6 +20,18 @@ export const PHONE_TOOLS: Tool[] = [
     },
   },
   {
+    name: 'long_press',
+    description: 'Long press a UI element by its node ID or screen coordinates (opens context menus, selects text)',
+    parameters: {
+      type: 'object',
+      properties: {
+        nodeId: { type: 'string', description: 'Accessibility node ID' },
+        x: { type: 'number', description: 'X coordinate (fallback if no nodeId)' },
+        y: { type: 'number', description: 'Y coordinate (fallback if no nodeId)' },
+      },
+    },
+  },
+  {
     name: 'type_text',
     description: 'Type text into the currently focused input field',
     parameters: {

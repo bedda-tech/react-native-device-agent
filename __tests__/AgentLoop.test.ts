@@ -13,6 +13,8 @@ const mockController = {
   }),
   tapNode: jest.fn().mockResolvedValue(true),
   tap: jest.fn().mockResolvedValue(true),
+  longPressNode: jest.fn().mockResolvedValue(true),
+  longPress: jest.fn().mockResolvedValue(true),
   setNodeText: jest.fn().mockResolvedValue(true),
   swipe: jest.fn().mockResolvedValue(true),
   scrollNode: jest.fn().mockResolvedValue(true),
@@ -628,6 +630,134 @@ describe('AgentLoop', () => {
 
       expect(capturedPrompts.length).toBeGreaterThanOrEqual(2);
       expect(capturedPrompts[1]).toContain('→ failed');
+    });
+  });
+
+  describe('long_press tool', () => {
+    function makeLongPressThenCompleteProvider(nodeId = 'item-1'): LLMProviderInterface {
+      let call = 0;
+      return {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return `{"name":"long_press","arguments":{"nodeId":"${nodeId}"}}`;
+          return `{"name":"task_complete","arguments":{"summary":"long press done"}}`;
+        },
+      };
+    }
+
+    it('calls longPressNode with the given nodeId', async () => {
+      const loop = new AgentLoop({
+        provider: makeLongPressThenCompleteProvider('menu-item'),
+        maxSteps: 5,
+        settleMs: 0,
+      });
+
+      await collectEvents(loop, 'Long press by node');
+
+      expect(mockController.longPressNode).toHaveBeenCalledWith('menu-item');
+    });
+
+    it('calls longPress with coordinates when no nodeId is given', async () => {
+      const coordProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          if (!mockController.longPress.mock.calls.length) {
+            return `{"name":"long_press","arguments":{"x":100,"y":200}}`;
+          }
+          return `{"name":"task_complete","arguments":{"summary":"done"}}`;
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider: coordProvider,
+        maxSteps: 5,
+        settleMs: 0,
+      });
+
+      await collectEvents(loop, 'Long press by coord');
+
+      expect(mockController.longPress).toHaveBeenCalledWith(100, 200);
+    });
+
+    it('emits an action event with tool=long_press', async () => {
+      const loop = new AgentLoop({
+        provider: makeLongPressThenCompleteProvider('x'),
+        maxSteps: 5,
+        settleMs: 0,
+      });
+
+      const events = await collectEvents(loop, 'Long press action event');
+
+      const action = events.find((e) => e.type === 'action') as
+        Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action?.tool).toBe('long_press');
+    });
+  });
+
+  describe('onAction / onComplete / onError callbacks', () => {
+    it('invokes onAction for each tool call (excluding task_complete)', async () => {
+      const onAction = jest.fn();
+      const loop = new AgentLoop({
+        provider: makeTapThenCompleteProvider('btn'),
+        maxSteps: 5,
+        settleMs: 0,
+        onAction,
+      });
+
+      await collectEvents(loop, 'Callback: onAction');
+
+      expect(onAction).toHaveBeenCalledTimes(1);
+      expect(onAction).toHaveBeenCalledWith(
+        expect.objectContaining({ tool: 'tap', args: { nodeId: 'btn' } }),
+      );
+      expect(typeof onAction.mock.calls[0][0].timestamp).toBe('number');
+    });
+
+    it('invokes onComplete with the summary when task_complete is called', async () => {
+      const onComplete = jest.fn();
+      const loop = new AgentLoop({
+        provider: makeCompletingProvider('mission accomplished'),
+        maxSteps: 5,
+        settleMs: 0,
+        onComplete,
+      });
+
+      await collectEvents(loop, 'Callback: onComplete');
+
+      expect(onComplete).toHaveBeenCalledTimes(1);
+      expect(onComplete).toHaveBeenCalledWith('mission accomplished');
+    });
+
+    it('invokes onError when the LLM provider throws', async () => {
+      const onError = jest.fn();
+      const loop = new AgentLoop({
+        provider: errorProvider,
+        maxSteps: 3,
+        settleMs: 0,
+        onError,
+      });
+
+      await collectEvents(loop, 'Callback: onError');
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(onError.mock.calls[0][0].message).toBe('LLM unavailable');
+    });
+
+    it('invokes onError when a tool execution throws', async () => {
+      mockController.tapNode.mockRejectedValueOnce(new Error('tap blocked'));
+      const onError = jest.fn();
+      const loop = new AgentLoop({
+        provider: makeTapThenCompleteProvider('blocked'),
+        maxSteps: 5,
+        settleMs: 0,
+        onError,
+      });
+
+      await collectEvents(loop, 'Callback: onError from tool');
+
+      expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'tap blocked' }));
     });
   });
 
