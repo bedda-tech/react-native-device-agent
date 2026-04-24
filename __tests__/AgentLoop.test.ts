@@ -441,6 +441,118 @@ describe('AgentLoop', () => {
     });
   });
 
+  describe('tool result tracking', () => {
+    it('action event has result=true after a successful tap', async () => {
+      mockController.tapNode.mockResolvedValue(true);
+
+      const loop = new AgentLoop({
+        provider: makeTapThenCompleteProvider('ok-node'),
+        maxSteps: 5,
+        settleMs: 0,
+      });
+
+      const events = await collectEvents(loop, 'Tap result tracking');
+
+      const action = events.find((e) => e.type === 'action') as
+        | Extract<AgentEvent, { type: 'action' }>
+        | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBe(true);
+    });
+
+    it('action event has result=false when tapNode returns false', async () => {
+      mockController.tapNode.mockResolvedValue(false);
+
+      const loop = new AgentLoop({
+        provider: makeTapThenCompleteProvider('fail-node'),
+        maxSteps: 5,
+        settleMs: 0,
+      });
+
+      const events = await collectEvents(loop, 'Tap fails');
+
+      const action = events.find((e) => e.type === 'action') as
+        | Extract<AgentEvent, { type: 'action' }>
+        | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBe(false);
+    });
+
+    it('action event has result=Error when tool throws', async () => {
+      mockController.tapNode.mockRejectedValueOnce(new Error('touch blocked'));
+
+      const loop = new AgentLoop({
+        provider: makeTapThenCompleteProvider('blocked-node'),
+        maxSteps: 5,
+        settleMs: 0,
+      });
+
+      const events = await collectEvents(loop, 'Tool throws');
+
+      const action = events.find((e) => e.type === 'action') as
+        | Extract<AgentEvent, { type: 'action' }>
+        | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBeInstanceOf(Error);
+      expect((action!.result as Error).message).toBe('touch blocked');
+    });
+
+    it('includes → ok in the prompt after a successful action', async () => {
+      mockController.tapNode.mockResolvedValue(true);
+
+      const capturedPrompts: string[] = [];
+      let call = 0;
+      const capturingProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(prompt: string): Promise<string> {
+          capturedPrompts.push(prompt);
+          call++;
+          if (call === 1) return '{"name":"tap","arguments":{"nodeId":"x"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider: capturingProvider,
+        maxSteps: 5,
+        settleMs: 0,
+      });
+
+      await collectEvents(loop, 'Check prompt annotation');
+
+      // Second prompt should include the action history with → ok
+      expect(capturedPrompts.length).toBeGreaterThanOrEqual(2);
+      expect(capturedPrompts[1]).toContain('→ ok');
+    });
+
+    it('includes → failed in the prompt after a failed action', async () => {
+      mockController.tapNode.mockResolvedValue(false);
+
+      const capturedPrompts: string[] = [];
+      let call = 0;
+      const capturingProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(prompt: string): Promise<string> {
+          capturedPrompts.push(prompt);
+          call++;
+          if (call === 1) return '{"name":"tap","arguments":{"nodeId":"x"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider: capturingProvider,
+        maxSteps: 5,
+        settleMs: 0,
+      });
+
+      await collectEvents(loop, 'Check failed annotation');
+
+      expect(capturedPrompts.length).toBeGreaterThanOrEqual(2);
+      expect(capturedPrompts[1]).toContain('→ failed');
+    });
+  });
+
   describe('thinking extraction', () => {
     it('emits a thinking event when the provider prefixes the tool call with text', async () => {
       let call = 0;

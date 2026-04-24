@@ -140,16 +140,23 @@ export class AgentLoop {
           return;
         }
 
-        // Emit action event
-        const actionEvent: AgentEvent = { type: 'action', tool: call.name, args: call.arguments };
+        // Emit action event before execution so the UI can show in-flight state.
+        // We hold a mutable reference so we can backfill result after execution.
+        const actionEvent: Extract<AgentEvent, { type: 'action' }> = {
+          type: 'action',
+          tool: call.name,
+          args: call.arguments,
+        };
         history.push(actionEvent);
         yield actionEvent;
 
-        // Execute the action
+        // Execute the action and record the result on the history entry so
+        // formatHistory() can annotate success / failure in the next prompt.
         try {
-          await this.executeToolCall(call);
+          actionEvent.result = await this.executeToolCall(call);
         } catch (err) {
           const error = err instanceof Error ? err : new Error(String(err));
+          actionEvent.result = error;
           const errEvent: AgentEvent = { type: 'error', error };
           history.push(errEvent);
           yield errEvent;
@@ -260,7 +267,8 @@ export class AgentLoop {
     return relevant
       .map((e) => {
         if (e.type === 'action') {
-          return `- Called ${e.tool}(${JSON.stringify(e.args)})`;
+          const base = `- Called ${e.tool}(${JSON.stringify(e.args)})`;
+          return `${base}${formatToolResult(e.result)}`;
         }
         if (e.type === 'observation') {
           return `- Step ${e.step}: observed screen`;
@@ -271,8 +279,8 @@ export class AgentLoop {
       .join('\n');
   }
 
-  private async executeToolCall(call: ToolCall): Promise<void> {
-    await this.registry.execute(call);
+  private async executeToolCall(call: ToolCall): Promise<unknown> {
+    return this.registry.execute(call);
   }
 
   private delay(ms: number): Promise<void> {
@@ -361,6 +369,20 @@ export class AgentLoop {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Format a tool result for inclusion in the history prompt.
+ * Returns an empty string when the result is undefined (action still in-flight).
+ */
+function formatToolResult(result: unknown): string {
+  if (result === undefined) return '';
+  if (result instanceof Error) return ` → error: ${result.message}`;
+  if (result === true) return ' → ok';
+  if (result === false) return ' → failed';
+  // Strings (e.g. read_screen content) are too long to inline; just note they succeeded.
+  if (typeof result === 'string') return result.length > 0 ? ' → ok' : ' → empty';
+  return ` → ${String(result)}`;
+}
 
 /**
  * Extract any plain-text thinking content that appears before tool call JSON.

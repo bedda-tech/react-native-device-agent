@@ -43,7 +43,17 @@ export interface AgentOptions {
  * Events yielded by the agent loop generator.
  */
 export type AgentEvent =
-  | { type: 'action'; tool: string; args: Record<string, unknown> }
+  | {
+      type: 'action';
+      tool: string;
+      args: Record<string, unknown>;
+      /**
+       * The value returned by the tool handler after execution.
+       * `undefined` while the action is still in-flight.
+       * `false` (boolean) or an Error typically indicates failure.
+       */
+      result?: unknown;
+    }
   | { type: 'observation'; screenState: string; step: number; screenshotPath?: string }
   | { type: 'thinking'; content: string }
   | { type: 'complete'; result: string }
