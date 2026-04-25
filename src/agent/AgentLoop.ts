@@ -105,6 +105,7 @@ export class AgentLoop {
     while (steps < this.options.maxSteps && !this.aborted) {
       if (this.options.timeoutMs > 0 && Date.now() - startTime >= this.options.timeoutMs) {
         yield { type: 'timeout' };
+        this.options.onTimeout?.();
         return;
       }
 

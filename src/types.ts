@@ -50,6 +50,8 @@ export interface AgentOptions {
    * `{ type: 'timeout' }` and stops. Default: 0 (no timeout).
    */
   timeoutMs?: number;
+  /** Callback invoked when the agent times out (only fires when timeoutMs > 0). */
+  onTimeout?: () => void;
   /** Callback invoked on error. */
   onError?: (error: Error) => void;
 }
