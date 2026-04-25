@@ -280,7 +280,7 @@ export class AgentLoop {
   }
 
   private buildPrompt(task: string, screenState: string, history: AgentEvent[]): string {
-    const historyText = this.formatHistory(history);
+    const historyText = this.formatHistory(history, this.options.maxHistoryItems);
     const suffix = (this.options.systemPromptSuffix ?? '').trim();
 
     return [
@@ -297,25 +297,36 @@ export class AgentLoop {
       .join('\n');
   }
 
-  private formatHistory(history: AgentEvent[]): string {
+  private formatHistory(history: AgentEvent[], maxItems?: number): string {
     const relevant = history.filter(
       (e) => e.type === 'action' || e.type === 'observation',
     );
     if (relevant.length === 0) return '';
 
-    return relevant
-      .map((e) => {
-        if (e.type === 'action') {
-          const base = `- Called ${e.tool}(${JSON.stringify(e.args)})`;
-          return `${base}${formatToolResult(e.result)}`;
-        }
-        if (e.type === 'observation') {
-          return `- Step ${e.step}: observed screen`;
-        }
-        return '';
-      })
-      .filter(Boolean)
-      .join('\n');
+    const limit = maxItems && maxItems > 0 ? maxItems : 0;
+    const pruned =
+      limit > 0 && relevant.length > limit
+        ? relevant.slice(relevant.length - limit)
+        : relevant;
+    const omitted = relevant.length - pruned.length;
+    const prefix = omitted > 0 ? `[${omitted} earlier actions omitted]\n` : '';
+
+    return (
+      prefix +
+      pruned
+        .map((e) => {
+          if (e.type === 'action') {
+            const base = `- Called ${e.tool}(${JSON.stringify(e.args)})`;
+            return `${base}${formatToolResult(e.result)}`;
+          }
+          if (e.type === 'observation') {
+            return `- Step ${e.step}: observed screen`;
+          }
+          return '';
+        })
+        .filter(Boolean)
+        .join('\n')
+    );
   }
 
   private async executeToolCall(call: ToolCall): Promise<unknown> {

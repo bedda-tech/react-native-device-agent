@@ -40,6 +40,13 @@ export interface AgentOptions {
   maxScreenLength?: number;
   /** Callback invoked on every action the agent takes. */
   onAction?: (action: AgentAction) => void;
+  /**
+   * Callback invoked after each screen observation step.
+   * Fires immediately after the observation event is yielded.
+   * Useful for external progress bars or debug panels without subscribing
+   * to the full history stream.
+   */
+  onObservation?: (observation: { screenState: string; step: number }) => void;
   /** Callback invoked when the agent completes a task. */
   onComplete?: (result: string) => void;
   /** Callback invoked when the agent explicitly fails a task via task_failed. */
@@ -71,6 +78,13 @@ export interface AgentOptions {
    * { toolFilter: ['tap', 'type_text', 'scroll'] }
    */
   toolFilter?: string[];
+  /**
+   * Maximum number of action + observation history entries included in each
+   * prompt. When the history grows beyond this limit, the oldest entries are
+   * dropped and replaced with a summary line. Protects context window on
+   * long-running tasks. Default: 0 (no limit).
+   */
+  maxHistoryItems?: number;
 }
 
 /**

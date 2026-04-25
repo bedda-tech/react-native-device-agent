@@ -1077,4 +1077,80 @@ describe('AgentLoop', () => {
       }
     });
   });
+
+  describe('maxHistoryItems', () => {
+    it('prefixes the prompt with omitted count when history exceeds limit', async () => {
+      // Provider: tap 3 times then complete. Each tap step produces an action + observation
+      // event, so after 3 steps the history has 6 relevant items.
+      // With maxHistoryItems=4, 2 earlier items are dropped.
+      let call = 0;
+      const capturedPrompts: string[] = [];
+      const provider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools(prompt: string): Promise<string> {
+          capturedPrompts.push(prompt);
+          call++;
+          if (call <= 3) return '{"name":"tap","arguments":{"nodeId":"btn"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, settleMs: 0, maxHistoryItems: 4 });
+      await collectEvents(loop, 'multi-step task');
+
+      // The 4th prompt has history from the 3 completed steps (6 items).
+      // With maxHistoryItems=4, 2 are omitted.
+      const fourthPrompt = capturedPrompts[3];
+      expect(fourthPrompt).toBeDefined();
+      expect(fourthPrompt).toContain('[2 earlier actions omitted]');
+    });
+
+    it('includes all history entries when maxHistoryItems is 0 (no limit)', async () => {
+      let call = 0;
+      const capturedPrompts: string[] = [];
+      const provider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools(prompt: string): Promise<string> {
+          capturedPrompts.push(prompt);
+          call++;
+          if (call <= 3) return '{"name":"tap","arguments":{"nodeId":"btn"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, settleMs: 0, maxHistoryItems: 0 });
+      await collectEvents(loop, 'multi-step no limit');
+
+      const fourthPrompt = capturedPrompts[3];
+      expect(fourthPrompt).toBeDefined();
+      // No omitted prefix
+      expect(fourthPrompt).not.toContain('earlier actions omitted');
+      // All 3 step observations should be present
+      expect(fourthPrompt).toContain('Step 1: observed screen');
+      expect(fourthPrompt).toContain('Step 2: observed screen');
+      expect(fourthPrompt).toContain('Step 3: observed screen');
+    });
+
+    it('does not prune when history is within the limit', async () => {
+      let call = 0;
+      const capturedPrompts: string[] = [];
+      const provider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools(prompt: string): Promise<string> {
+          capturedPrompts.push(prompt);
+          call++;
+          if (call === 1) return '{"name":"tap","arguments":{"nodeId":"btn"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      // After 1 tap step: 2 relevant items (action + observation). Limit=10 → no pruning.
+      const loop = new AgentLoop({ provider, settleMs: 0, maxHistoryItems: 10 });
+      await collectEvents(loop, 'single step within limit');
+
+      const secondPrompt = capturedPrompts[1];
+      expect(secondPrompt).toBeDefined();
+      expect(secondPrompt).not.toContain('earlier actions omitted');
+    });
+  });
 });
