@@ -56,6 +56,21 @@ export interface AgentOptions {
   onMaxSteps?: () => void;
   /** Callback invoked on error. */
   onError?: (error: Error) => void;
+  /**
+   * Restrict which phone tools are offered to the LLM for this task.
+   *
+   * When specified, only tools whose `name` is in this list are passed to the
+   * provider. `task_complete` and `task_failed` are always included regardless
+   * (the loop depends on them to exit). Omit for all PHONE_TOOLS (default).
+   *
+   * @example
+   * // Read-only analysis — the agent can read the screen but cannot act
+   * { toolFilter: ['read_screen', 'screenshot'] }
+   *
+   * // Form-filling only — restrict navigation side-effects
+   * { toolFilter: ['tap', 'type_text', 'scroll'] }
+   */
+  toolFilter?: string[];
 }
 
 /**

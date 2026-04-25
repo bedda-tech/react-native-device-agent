@@ -76,7 +76,13 @@ export class AgentLoop {
       ...options,
     };
     this.registry = new ToolRegistry();
-    this.tools = [...PHONE_TOOLS];
+    const { toolFilter } = options;
+    if (toolFilter) {
+      const allowed = new Set([...toolFilter, 'task_complete', 'task_failed']);
+      this.tools = PHONE_TOOLS.filter((t) => allowed.has(t.name));
+    } else {
+      this.tools = [...PHONE_TOOLS];
+    }
     this.registerDefaultTools();
   }
 

@@ -996,4 +996,85 @@ describe('AgentLoop', () => {
       expect(events.find((e) => e.type === 'complete')).toBeDefined();
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // toolFilter
+  // ---------------------------------------------------------------------------
+
+  describe('toolFilter', () => {
+    it('passes only filtered tools to the provider', async () => {
+      const capturedTools: string[] = [];
+      const provider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools(_prompt, tools) {
+          capturedTools.push(...tools.map((t) => t.name));
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider,
+        settleMs: 0,
+        toolFilter: ['read_screen', 'screenshot'],
+      });
+
+      await collectEvents(loop, 'read-only task');
+
+      const unique = [...new Set(capturedTools)];
+      expect(unique).toContain('read_screen');
+      expect(unique).toContain('screenshot');
+      expect(unique).toContain('task_complete');
+      expect(unique).toContain('task_failed');
+      // Navigation tools must be absent
+      expect(unique).not.toContain('tap');
+      expect(unique).not.toContain('swipe');
+    });
+
+    it('always includes task_complete and task_failed even if omitted from filter', async () => {
+      const capturedTools: string[] = [];
+      const provider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools(_prompt, tools) {
+          capturedTools.push(...tools.map((t) => t.name));
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      // Filter explicitly excludes task_complete and task_failed
+      const loop = new AgentLoop({
+        provider,
+        settleMs: 0,
+        toolFilter: ['tap'],
+      });
+
+      await collectEvents(loop, 'tap-only task');
+
+      const unique = [...new Set(capturedTools)];
+      expect(unique).toContain('tap');
+      expect(unique).toContain('task_complete');
+      expect(unique).toContain('task_failed');
+    });
+
+    it('passes all PHONE_TOOLS when toolFilter is not specified', async () => {
+      const capturedTools: string[] = [];
+      const provider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools(_prompt, tools) {
+          capturedTools.push(...tools.map((t) => t.name));
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, settleMs: 0 });
+      await collectEvents(loop, 'full tools task');
+
+      const unique = [...new Set(capturedTools)];
+      // Verify a broad set of tools are present
+      for (const name of ['tap', 'swipe', 'scroll', 'type_text', 'open_app',
+        'global_action', 'read_screen', 'screenshot', 'wait', 'find_node',
+        'task_complete', 'task_failed']) {
+        expect(unique).toContain(name);
+      }
+    });
+  });
 });
