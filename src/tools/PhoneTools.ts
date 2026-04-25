@@ -164,3 +164,66 @@ export const PHONE_TOOLS: Tool[] = [
     },
   },
 ];
+
+/**
+ * Named subsets of PHONE_TOOLS for use with `AgentOptions.toolFilter`.
+ *
+ * Pass one of these arrays (or a custom list) to `toolFilter` to restrict
+ * which actions the LLM can take for a given task. `task_complete` and
+ * `task_failed` are always included by the agent loop regardless.
+ *
+ * @example
+ * // Read-only analysis — agent can observe but not act
+ * new AgentLoop({ provider, toolFilter: PHONE_TOOL_PRESETS.READ_ONLY })
+ *
+ * // Form-filling — agent can interact with inputs but not navigate freely
+ * new AgentLoop({ provider, toolFilter: PHONE_TOOL_PRESETS.TEXT_INPUT })
+ */
+export const PHONE_TOOL_PRESETS = {
+  /** All available tools (default — same as omitting toolFilter). */
+  FULL: undefined as string[] | undefined,
+
+  /** Read the screen and take screenshots only. No actions are taken. */
+  READ_ONLY: ['read_screen', 'screenshot'] as string[],
+
+  /** Navigate the phone: tap, swipe, scroll, open apps, use system buttons. No text input. */
+  NAVIGATION: [
+    'tap',
+    'long_press',
+    'swipe',
+    'scroll',
+    'global_action',
+    'open_app',
+    'find_node',
+    'wait',
+    'read_screen',
+  ] as string[],
+
+  /**
+   * Fill forms and interact with text fields.
+   * Includes tap (to focus fields) but restricts free navigation.
+   */
+  TEXT_INPUT: [
+    'tap',
+    'type_text',
+    'find_node',
+    'scroll',
+    'read_screen',
+  ] as string[],
+
+  /**
+   * Access the info/settings of a specific app without leaving it.
+   * Excludes open_app and global_action (HOME/BACK) to prevent navigating away.
+   */
+  IN_APP: [
+    'tap',
+    'long_press',
+    'type_text',
+    'swipe',
+    'scroll',
+    'find_node',
+    'wait',
+    'read_screen',
+    'screenshot',
+  ] as string[],
+} as const;

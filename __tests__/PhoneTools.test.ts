@@ -1,4 +1,4 @@
-import { PHONE_TOOLS } from '../src/tools/PhoneTools';
+import { PHONE_TOOLS, PHONE_TOOL_PRESETS } from '../src/tools/PhoneTools';
 import type { Tool } from '../src/types';
 
 // ---------------------------------------------------------------------------
@@ -178,5 +178,56 @@ describe('task_failed tool', () => {
     const tool = getTool('task_failed');
     expect(tool.parameters.required).toContain('reason');
     expect(tool.parameters.properties.reason?.type).toBe('string');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PHONE_TOOL_PRESETS
+// ---------------------------------------------------------------------------
+
+describe('PHONE_TOOL_PRESETS', () => {
+  const allToolNames = PHONE_TOOLS.map((t) => t.name);
+
+  test('FULL is undefined (signals use all tools)', () => {
+    expect(PHONE_TOOL_PRESETS.FULL).toBeUndefined();
+  });
+
+  test('READ_ONLY contains read_screen and screenshot only', () => {
+    const preset = PHONE_TOOL_PRESETS.READ_ONLY;
+    expect(preset).toContain('read_screen');
+    expect(preset).toContain('screenshot');
+    expect(preset).not.toContain('tap');
+    expect(preset).not.toContain('swipe');
+  });
+
+  test('NAVIGATION does not contain type_text', () => {
+    expect(PHONE_TOOL_PRESETS.NAVIGATION).not.toContain('type_text');
+  });
+
+  test('TEXT_INPUT does not contain swipe or global_action', () => {
+    const preset = PHONE_TOOL_PRESETS.TEXT_INPUT;
+    expect(preset).not.toContain('swipe');
+    expect(preset).not.toContain('global_action');
+    expect(preset).not.toContain('open_app');
+  });
+
+  test('IN_APP does not contain open_app or global_action', () => {
+    const preset = PHONE_TOOL_PRESETS.IN_APP;
+    expect(preset).not.toContain('open_app');
+    expect(preset).not.toContain('global_action');
+  });
+
+  test('all preset tool names exist in PHONE_TOOLS', () => {
+    const presets = [
+      PHONE_TOOL_PRESETS.READ_ONLY,
+      PHONE_TOOL_PRESETS.NAVIGATION,
+      PHONE_TOOL_PRESETS.TEXT_INPUT,
+      PHONE_TOOL_PRESETS.IN_APP,
+    ];
+    for (const preset of presets) {
+      for (const name of preset) {
+        expect(allToolNames).toContain(name);
+      }
+    }
   });
 });

@@ -31,7 +31,7 @@ export type { SubTask, PlannerEvent, TaskPlannerOptions } from './agent/TaskPlan
 // ---------------------------------------------------------------------------
 
 export { ToolRegistry } from './tools/ToolRegistry';
-export { PHONE_TOOLS } from './tools/PhoneTools';
+export { PHONE_TOOLS, PHONE_TOOL_PRESETS } from './tools/PhoneTools';
 
 // ---------------------------------------------------------------------------
 // Providers
