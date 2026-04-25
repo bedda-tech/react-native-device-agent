@@ -119,11 +119,6 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
               pending: true,
               timestamp: Date.now(),
             });
-            optionsRef.current.onAction?.({
-              tool: event.tool,
-              args: event.args,
-              timestamp: Date.now(),
-            });
             break;
 
           case 'observation':
@@ -146,7 +141,6 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
               kind: 'text',
               timestamp: Date.now(),
             });
-            optionsRef.current.onComplete?.(event.result);
             break;
 
           case 'max_steps_reached':
@@ -155,6 +149,28 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
               id: nextId(),
               role: 'system',
               text: 'Max steps reached without completing the task.',
+              kind: 'text',
+              timestamp: Date.now(),
+            });
+            break;
+
+          case 'failed':
+            resolveLastAction();
+            appendMessage({
+              id: nextId(),
+              role: 'system',
+              text: `Task failed: ${event.reason}`,
+              kind: 'text',
+              timestamp: Date.now(),
+            });
+            break;
+
+          case 'timeout':
+            resolveLastAction();
+            appendMessage({
+              id: nextId(),
+              role: 'system',
+              text: 'Task timed out before completing.',
               kind: 'text',
               timestamp: Date.now(),
             });
@@ -169,7 +185,6 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
               kind: 'text',
               timestamp: Date.now(),
             });
-            optionsRef.current.onError?.(event.error);
             break;
         }
       }
