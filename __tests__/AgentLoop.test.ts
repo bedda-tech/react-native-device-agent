@@ -217,6 +217,33 @@ describe('AgentLoop', () => {
       const observations = events.filter((e) => e.type === 'observation');
       expect(observations).toHaveLength(3);
     });
+
+    it('invokes onMaxSteps callback when the step limit is reached', async () => {
+      const onMaxSteps = jest.fn();
+      const loop = new AgentLoop({
+        provider: makePlainTextProvider(),
+        maxSteps: 2,
+        settleMs: 0,
+        onMaxSteps,
+      });
+
+      await collectEvents(loop, 'Trigger max steps');
+
+      expect(onMaxSteps).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not invoke onMaxSteps when the task completes normally', async () => {
+      const onMaxSteps = jest.fn();
+      const loop = new AgentLoop({
+        provider: makeCompletingProvider(),
+        settleMs: 0,
+        onMaxSteps,
+      });
+
+      await collectEvents(loop, 'Normal task');
+
+      expect(onMaxSteps).not.toHaveBeenCalled();
+    });
   });
 
   describe('abort', () => {

@@ -218,6 +218,7 @@ export class AgentLoop {
     }
 
     yield { type: 'max_steps_reached' };
+    this.options.onMaxSteps?.();
   }
 
   /**

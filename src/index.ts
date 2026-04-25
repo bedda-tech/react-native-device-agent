@@ -54,3 +54,5 @@ export { useAgentChat } from './hooks/useAgentChat';
 export type { UseAgentChatState } from './hooks/useAgentChat';
 export { useTaskPlanner } from './hooks/useTaskPlanner';
 export type { UseTaskPlannerState } from './hooks/useTaskPlanner';
+export { useTaskQueue } from './hooks/useTaskQueue';
+export type { UseTaskQueueState, TaskQueueItem, TaskQueueResult } from './hooks/useTaskQueue';

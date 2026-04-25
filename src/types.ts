@@ -52,6 +52,8 @@ export interface AgentOptions {
   timeoutMs?: number;
   /** Callback invoked when the agent times out (only fires when timeoutMs > 0). */
   onTimeout?: () => void;
+  /** Callback invoked when the agent exhausts all steps without completing the task. */
+  onMaxSteps?: () => void;
   /** Callback invoked on error. */
   onError?: (error: Error) => void;
 }
