@@ -44,6 +44,12 @@ export interface AgentOptions {
   onComplete?: (result: string) => void;
   /** Callback invoked when the agent explicitly fails a task via task_failed. */
   onFailed?: (reason: string) => void;
+  /**
+   * Maximum wall-clock milliseconds the loop may run before being terminated.
+   * When the timeout elapses between iterations the loop yields
+   * `{ type: 'timeout' }` and stops. Default: 0 (no timeout).
+   */
+  timeoutMs?: number;
   /** Callback invoked on error. */
   onError?: (error: Error) => void;
 }
@@ -68,7 +74,8 @@ export type AgentEvent =
   | { type: 'complete'; result: string }
   | { type: 'failed'; reason: string }
   | { type: 'error'; error: Error }
-  | { type: 'max_steps_reached' };
+  | { type: 'max_steps_reached' }
+  | { type: 'timeout' };
 
 /**
  * A single action taken by the agent.

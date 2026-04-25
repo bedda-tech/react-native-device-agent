@@ -903,4 +903,46 @@ describe('AgentLoop', () => {
       ).toContain('Let me tap');
     });
   });
+
+  describe('timeoutMs', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it('emits timeout event when elapsed time exceeds timeoutMs', async () => {
+      // Provider never finishes — always taps so the loop keeps iterating.
+      const loopingProvider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools() {
+          return '{"name":"tap","arguments":{"nodeId":"x"}}';
+        },
+      };
+
+      // Simulate time: startTime=0, first iteration check returns 6000 (>5000).
+      let callCount = 0;
+      jest.spyOn(Date, 'now').mockImplementation(() => callCount++ === 0 ? 0 : 6000);
+
+      const loop = new AgentLoop({
+        provider: loopingProvider,
+        timeoutMs: 5000,
+        settleMs: 0,
+        maxSteps: 20,
+      });
+
+      const events = await collectEvents(loop, 'loop forever');
+      const timeoutEvent = events.find((e) => e.type === 'timeout');
+      expect(timeoutEvent).toBeDefined();
+      expect(events.find((e) => e.type === 'max_steps_reached')).toBeUndefined();
+    });
+
+    it('does not emit timeout when timeoutMs is 0 (disabled)', async () => {
+      const loop = new AgentLoop({
+        provider: makeCompletingProvider(),
+        timeoutMs: 0,
+        settleMs: 0,
+      });
+
+      const events = await collectEvents(loop, 'quick task');
+      expect(events.find((e) => e.type === 'timeout')).toBeUndefined();
+      expect(events.find((e) => e.type === 'complete')).toBeDefined();
+    });
+  });
 });

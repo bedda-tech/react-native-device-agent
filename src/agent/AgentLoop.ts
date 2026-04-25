@@ -58,6 +58,7 @@ export class AgentLoop {
     retryOnError: number;
     systemPromptSuffix: string;
     maxScreenLength: number;
+    timeoutMs: number;
   };
   private aborted = false;
   private registry: ToolRegistry;
@@ -71,6 +72,7 @@ export class AgentLoop {
       retryOnError: 0,
       systemPromptSuffix: '',
       maxScreenLength: 6000,
+      timeoutMs: 0,
       ...options,
     };
     this.registry = new ToolRegistry();
@@ -98,7 +100,14 @@ export class AgentLoop {
       return;
     }
 
+    const startTime = Date.now();
+
     while (steps < this.options.maxSteps && !this.aborted) {
+      if (this.options.timeoutMs > 0 && Date.now() - startTime >= this.options.timeoutMs) {
+        yield { type: 'timeout' };
+        return;
+      }
+
       // Build the prompt
       const prompt = this.buildPrompt(task, screenState, history);
 
