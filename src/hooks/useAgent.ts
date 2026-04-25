@@ -40,22 +40,6 @@ export function useAgent(options: AgentOptions): UseAgentState {
     try {
       for await (const event of loop.run(task)) {
         setHistory((prev) => [...prev, event]);
-
-        if (event.type === 'action' && optionsRef.current.onAction) {
-          optionsRef.current.onAction({
-            tool: event.tool,
-            args: event.args,
-            timestamp: Date.now(),
-          });
-        }
-
-        if (event.type === 'complete' && optionsRef.current.onComplete) {
-          optionsRef.current.onComplete(event.result);
-        }
-
-        if (event.type === 'error' && optionsRef.current.onError) {
-          optionsRef.current.onError(event.error);
-        }
       }
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));

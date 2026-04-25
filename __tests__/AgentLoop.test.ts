@@ -933,6 +933,30 @@ describe('AgentLoop', () => {
       expect(events.find((e) => e.type === 'max_steps_reached')).toBeUndefined();
     });
 
+    it('invokes onTimeout callback when the loop times out', async () => {
+      const loopingProvider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools() {
+          return '{"name":"tap","arguments":{"nodeId":"x"}}';
+        },
+      };
+
+      let callCount = 0;
+      jest.spyOn(Date, 'now').mockImplementation(() => callCount++ === 0 ? 0 : 6000);
+
+      const onTimeout = jest.fn();
+      const loop = new AgentLoop({
+        provider: loopingProvider,
+        timeoutMs: 5000,
+        settleMs: 0,
+        maxSteps: 20,
+        onTimeout,
+      });
+
+      await collectEvents(loop, 'timeout callback test');
+      expect(onTimeout).toHaveBeenCalledTimes(1);
+    });
+
     it('does not emit timeout when timeoutMs is 0 (disabled)', async () => {
       const loop = new AgentLoop({
         provider: makeCompletingProvider(),
