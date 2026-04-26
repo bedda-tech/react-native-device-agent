@@ -803,6 +803,28 @@ describe('AgentLoop', () => {
         expect.objectContaining({ screenState: expect.any(String), step: 1 }),
       );
     });
+
+    it('invokes onThinking when the model emits text before a tool call', async () => {
+      const onThinking = jest.fn();
+      // Provider whose first response has thinking text before the JSON tool call.
+      let call = 0;
+      const thinkingProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) {
+            return 'I should tap the button.\n{"name":"tap","arguments":{"nodeId":"btn"}}';
+          }
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider: thinkingProvider, maxSteps: 5, settleMs: 0, onThinking });
+      await collectEvents(loop, 'Callback: onThinking');
+
+      expect(onThinking).toHaveBeenCalledTimes(1);
+      expect(onThinking).toHaveBeenCalledWith('I should tap the button.');
+    });
   });
 
   describe('task_failed', () => {

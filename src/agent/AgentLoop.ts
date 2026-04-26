@@ -135,6 +135,7 @@ export class AgentLoop {
         const event: AgentEvent = { type: 'thinking', content: thinking };
         history.push(event);
         yield event;
+        this.options.onThinking?.(thinking);
       }
 
       // Parse tool calls from the response

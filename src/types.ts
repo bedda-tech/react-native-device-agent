@@ -40,6 +40,8 @@ export interface AgentOptions {
   maxScreenLength?: number;
   /** Callback invoked on every action the agent takes. */
   onAction?: (action: AgentAction) => void;
+  /** Callback invoked when the model emits reasoning/thinking text before a tool call. */
+  onThinking?: (content: string) => void;
   /**
    * Callback invoked after each screen observation step.
    * Fires immediately after the observation event is yielded.
