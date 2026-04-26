@@ -147,6 +147,7 @@ export class AgentLoop {
         const obsEvent: AgentEvent = { type: 'observation', screenState, step: steps };
         history.push(obsEvent);
         yield obsEvent;
+        this.options.onObservation?.({ screenState, step: steps });
         continue;
       }
 
@@ -221,6 +222,7 @@ export class AgentLoop {
       const obsEvent: AgentEvent = { type: 'observation', screenState, step: steps, screenshotPath };
       history.push(obsEvent);
       yield obsEvent;
+      this.options.onObservation?.({ screenState, step: steps });
     }
 
     yield { type: 'max_steps_reached' };
