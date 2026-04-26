@@ -786,6 +786,23 @@ describe('AgentLoop', () => {
 
       expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'tap blocked' }));
     });
+
+    it('invokes onObservation after each screen re-read', async () => {
+      const onObservation = jest.fn();
+      const loop = new AgentLoop({
+        provider: makeTapThenCompleteProvider('btn'),
+        maxSteps: 5,
+        settleMs: 0,
+        onObservation,
+      });
+
+      await collectEvents(loop, 'Callback: onObservation');
+
+      expect(onObservation).toHaveBeenCalledTimes(1);
+      expect(onObservation).toHaveBeenCalledWith(
+        expect.objectContaining({ screenState: expect.any(String), step: 1 }),
+      );
+    });
   });
 
   describe('task_failed', () => {
