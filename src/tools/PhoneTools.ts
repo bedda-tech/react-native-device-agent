@@ -142,6 +142,18 @@ export const PHONE_TOOLS: Tool[] = [
     },
   },
   {
+    name: 'find_all_nodes',
+    description: 'Search the accessibility tree for ALL nodes matching the query. Returns an array of nodeIds (may be empty). Use when you need to iterate over multiple matching elements, e.g. all checkboxes or all list items.',
+    parameters: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Substring to match against node text (case-sensitive)' },
+        contentDescription: { type: 'string', description: 'Substring to match against node content description' },
+        className: { type: 'string', description: 'Exact class name to match (e.g. android.widget.Button)' },
+      },
+    },
+  },
+  {
     name: 'task_complete',
     description: 'Signal that the task has been completed successfully',
     parameters: {
@@ -195,6 +207,7 @@ export const PHONE_TOOL_PRESETS = {
     'global_action',
     'open_app',
     'find_node',
+    'find_all_nodes',
     'wait',
     'read_screen',
   ] as string[],
@@ -207,6 +220,7 @@ export const PHONE_TOOL_PRESETS = {
     'tap',
     'type_text',
     'find_node',
+    'find_all_nodes',
     'scroll',
     'read_screen',
   ] as string[],
@@ -222,6 +236,7 @@ export const PHONE_TOOL_PRESETS = {
     'swipe',
     'scroll',
     'find_node',
+    'find_all_nodes',
     'wait',
     'read_screen',
     'screenshot',

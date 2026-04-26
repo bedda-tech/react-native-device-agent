@@ -938,6 +938,94 @@ describe('AgentLoop', () => {
     });
   });
 
+  describe('find_all_nodes tool', () => {
+    it('returns all matching nodeIds from a flat tree', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue([
+        { nodeId: 'btn1', text: 'Settings', contentDescription: null, className: 'Button', children: [] },
+        { nodeId: 'view1', text: 'Home', contentDescription: null, className: 'View', children: [] },
+        { nodeId: 'btn2', text: 'Advanced Settings', contentDescription: null, className: 'Button', children: [] },
+      ]);
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"find_all_nodes","arguments":{"text":"Settings"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'find all Settings nodes');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'find_all_nodes',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toEqual(['btn1', 'btn2']);
+    });
+
+    it('returns an empty array when no nodes match', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue([
+        { nodeId: 'root', text: 'Home', contentDescription: null, className: 'FrameLayout', children: [] },
+      ]);
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"find_all_nodes","arguments":{"text":"Settings"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'find all nodes no match');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'find_all_nodes',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toEqual([]);
+    });
+
+    it('collects matching nodes across a nested tree', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue([
+        {
+          nodeId: 'container',
+          text: null,
+          contentDescription: null,
+          className: 'View',
+          children: [
+            { nodeId: 'child1', text: null, contentDescription: null, className: 'android.widget.Button', children: [] },
+            { nodeId: 'child2', text: null, contentDescription: null, className: 'android.widget.Button', children: [] },
+          ],
+        },
+      ]);
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"find_all_nodes","arguments":{"className":"android.widget.Button"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'find all buttons');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'find_all_nodes',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toEqual(['child1', 'child2']);
+    });
+  });
+
   describe('thinking extraction', () => {
     it('emits a thinking event when the provider prefixes the tool call with text', async () => {
       let call = 0;
@@ -1110,7 +1198,7 @@ describe('AgentLoop', () => {
       const unique = [...new Set(capturedTools)];
       // Verify a broad set of tools are present
       for (const name of ['tap', 'swipe', 'scroll', 'type_text', 'open_app',
-        'global_action', 'read_screen', 'screenshot', 'wait', 'find_node',
+        'global_action', 'read_screen', 'screenshot', 'wait', 'find_node', 'find_all_nodes',
         'task_complete', 'task_failed']) {
         expect(unique).toContain(name);
       }

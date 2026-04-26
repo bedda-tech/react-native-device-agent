@@ -51,6 +51,7 @@ describe('PHONE_TOOLS', () => {
       'global_action',
       'wait',
       'find_node',
+      'find_all_nodes',
       'task_complete',
       'task_failed',
     ];
@@ -166,6 +167,16 @@ describe('read_screen and screenshot tools', () => {
 describe('find_node tool', () => {
   test('has text, contentDescription, and className — all optional', () => {
     const tool = getTool('find_node');
+    expect(tool.parameters.properties.text?.type).toBe('string');
+    expect(tool.parameters.properties.contentDescription?.type).toBe('string');
+    expect(tool.parameters.properties.className?.type).toBe('string');
+    expect(tool.parameters.required).toBeUndefined();
+  });
+});
+
+describe('find_all_nodes tool', () => {
+  test('has text, contentDescription, and className — all optional', () => {
+    const tool = getTool('find_all_nodes');
     expect(tool.parameters.properties.text?.type).toBe('string');
     expect(tool.parameters.properties.contentDescription?.type).toBe('string');
     expect(tool.parameters.properties.className?.type).toBe('string');

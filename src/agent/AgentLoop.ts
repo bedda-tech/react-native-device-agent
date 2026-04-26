@@ -419,6 +419,18 @@ export class AgentLoop {
       });
     });
 
+    this.registry.register(phoneTool('find_all_nodes'), async (args) => {
+      const ctrl = getController();
+      const tree = await ctrl.getAccessibilityTree();
+      return collectAllNodes(tree, {
+        text: args.text !== undefined ? String(args.text) : undefined,
+        contentDescription: args.contentDescription !== undefined
+          ? String(args.contentDescription)
+          : undefined,
+        className: args.className !== undefined ? String(args.className) : undefined,
+      });
+    });
+
     this.registry.register(phoneTool('screenshot'), async () => {
       const ctrl = getController();
       return ctrl.takeScreenshot();
@@ -498,6 +510,46 @@ function searchNodes(
     if (found) return found;
   }
   return null;
+}
+
+/**
+ * Collect all nodeIds in the accessibility tree that match the query.
+ * Returns an array (possibly empty) of matching nodeIds.
+ */
+function collectAllNodes(
+  tree: unknown,
+  query: { text?: string; contentDescription?: string; className?: string },
+): string[] {
+  const roots = Array.isArray(tree) ? tree : [tree];
+  const results: string[] = [];
+  gatherNodes(roots as Record<string, unknown>[], query, results);
+  return results;
+}
+
+function gatherNodes(
+  nodes: Record<string, unknown>[],
+  query: { text?: string; contentDescription?: string; className?: string },
+  results: string[],
+): void {
+  for (const node of nodes) {
+    const nodeText = typeof node.text === 'string' ? node.text : null;
+    const nodeDesc = typeof node.contentDescription === 'string' ? node.contentDescription : null;
+    const nodeCls = typeof node.className === 'string' ? node.className : null;
+
+    const matches =
+      (query.text !== undefined && nodeText !== null && nodeText.includes(query.text)) ||
+      (query.contentDescription !== undefined && nodeDesc !== null && nodeDesc.includes(query.contentDescription)) ||
+      (query.className !== undefined && nodeCls === query.className);
+
+    if (matches && typeof node.nodeId === 'string') {
+      results.push(node.nodeId);
+    }
+
+    const children = Array.isArray(node.children)
+      ? (node.children as Record<string, unknown>[])
+      : [];
+    gatherNodes(children, query, results);
+  }
 }
 
 /**
