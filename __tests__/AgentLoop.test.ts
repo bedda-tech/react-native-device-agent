@@ -1061,6 +1061,76 @@ describe('AgentLoop', () => {
     });
   });
 
+  describe('type_text tool', () => {
+    it('calls setNodeText with the provided nodeId when given', async () => {
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"type_text","arguments":{"text":"hello","nodeId":"input-1"}}';
+          return '{"name":"task_complete","arguments":{"summary":"typed"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      await collectEvents(loop, 'type hello');
+
+      expect(mockController.setNodeText).toHaveBeenCalledWith('input-1', 'hello');
+    });
+
+    it('auto-detects focused editable node when nodeId is omitted', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue({
+        nodeId: 'root',
+        className: 'FrameLayout',
+        children: [
+          {
+            nodeId: 'search-box',
+            className: 'EditText',
+            text: '',
+            isFocused: true,
+            isEditable: true,
+            children: [],
+          },
+        ],
+      });
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"type_text","arguments":{"text":"search query"}}';
+          return '{"name":"task_complete","arguments":{"summary":"typed"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      await collectEvents(loop, 'search for something');
+
+      expect(mockController.setNodeText).toHaveBeenCalledWith('search-box', 'search query');
+    });
+
+    it('emits error when no focused editable node and no nodeId given', async () => {
+      // Default tree has no editable/focused node
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"type_text","arguments":{"text":"oops"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'type without focus');
+
+      const errorEvent = events.find((e) => e.type === 'error');
+      expect(errorEvent).toBeDefined();
+    });
+  });
+
   describe('thinking extraction', () => {
     it('emits a thinking event when the provider prefixes the tool call with text', async () => {
       let call = 0;

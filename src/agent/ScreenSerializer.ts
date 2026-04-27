@@ -16,6 +16,8 @@ interface A11yNode {
   isScrollable?: boolean;
   isEditable?: boolean;
   isFocused?: boolean;
+  isChecked?: boolean;
+  isEnabled?: boolean;
   children?: A11yNode[];
 }
 
@@ -57,7 +59,9 @@ export class ScreenSerializer {
         line.includes('(clickable') ||
         line.includes('(editable') ||
         line.includes('(focused') ||
-        line.includes('(scrollable')
+        line.includes('(scrollable') ||
+        line.includes('checked') ||
+        line.includes('disabled')
       );
     });
 
@@ -97,6 +101,8 @@ export class ScreenSerializer {
     if (node.isEditable) flags.push('editable');
     if (node.isScrollable) flags.push('scrollable');
     if (node.isFocused) flags.push('focused');
+    if (node.isChecked) flags.push('checked');
+    if (node.isEnabled === false) flags.push('disabled');
     if (flags.length > 0) parts.push(`(${flags.join(',')})`);
 
     // Bounds (compact)

@@ -60,6 +60,24 @@ describe('ScreenSerializer.serialize', () => {
     expect(result).toContain('scrollable');
   });
 
+  it('includes checked flag for checked nodes', () => {
+    const node = makeNode({ isChecked: true, isClickable: false });
+    const result = ScreenSerializer.serialize(node);
+    expect(result).toContain('checked');
+  });
+
+  it('includes disabled flag when isEnabled is false', () => {
+    const node = makeNode({ isEnabled: false, isClickable: false });
+    const result = ScreenSerializer.serialize(node);
+    expect(result).toContain('disabled');
+  });
+
+  it('does not include disabled flag when isEnabled is true', () => {
+    const node = makeNode({ isEnabled: true, isClickable: false });
+    const result = ScreenSerializer.serialize(node);
+    expect(result).not.toContain('disabled');
+  });
+
   it('includes bounds', () => {
     const node = makeNode({ bounds: { left: 10, top: 20, right: 200, bottom: 80 } });
     const result = ScreenSerializer.serialize(node);

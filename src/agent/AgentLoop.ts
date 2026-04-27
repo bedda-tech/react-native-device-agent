@@ -372,15 +372,18 @@ export class AgentLoop {
     this.registry.register(phoneTool('type_text'), async (args) => {
       const ctrl = getController();
       const text = String(args.text ?? '');
-      const nodeId = args.nodeId ? String(args.nodeId) : null;
-      if (nodeId) {
-        return ctrl.setNodeText(nodeId, text);
+      let nodeId = args.nodeId ? String(args.nodeId) : null;
+      if (!nodeId) {
+        // Auto-detect the currently focused editable field.
+        const tree = await ctrl.getAccessibilityTree();
+        nodeId = findFocusedEditableNode(tree);
+        if (!nodeId) {
+          throw new Error(
+            'type_text: no focused editable field found. Tap the target input first, or provide a nodeId.',
+          );
+        }
       }
-      // No nodeId -- try to type into whatever is currently focused.
-      // AccessibilityController doesn't expose a direct "type" API without
-      // a node ID, so we fall back to setNodeText with an empty string as
-      // a no-op signal; real implementation will inject via IME.
-      throw new Error('type_text requires a nodeId targeting an editable field');
+      return ctrl.setNodeText(nodeId, text);
     });
 
     this.registry.register(phoneTool('swipe'), async (args) => {
@@ -556,6 +559,29 @@ function gatherNodes(
       : [];
     gatherNodes(children, query, results);
   }
+}
+
+/**
+ * Find the nodeId of the currently focused editable field in the accessibility tree.
+ * Returns null if no focused editable node exists.
+ */
+function findFocusedEditableNode(tree: unknown): string | null {
+  const roots = Array.isArray(tree) ? tree : [tree];
+  return searchFocusedEditable(roots as Record<string, unknown>[]);
+}
+
+function searchFocusedEditable(nodes: Record<string, unknown>[]): string | null {
+  for (const node of nodes) {
+    if (node.isFocused === true && node.isEditable === true) {
+      return typeof node.nodeId === 'string' ? node.nodeId : null;
+    }
+    const children = Array.isArray(node.children)
+      ? (node.children as Record<string, unknown>[])
+      : [];
+    const found = searchFocusedEditable(children);
+    if (found) return found;
+  }
+  return null;
 }
 
 /**

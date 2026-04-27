@@ -33,14 +33,15 @@ export const PHONE_TOOLS: Tool[] = [
   },
   {
     name: 'type_text',
-    description: 'Type text into the currently focused input field',
+    description:
+      'Set text in an input field. If nodeId is omitted, the currently focused editable field is used. Always tap the field first to focus it before calling type_text without a nodeId.',
     parameters: {
       type: 'object',
       properties: {
-        text: { type: 'string', description: 'Text to type' },
+        text: { type: 'string', description: 'Text to set (replaces existing content)' },
         nodeId: {
           type: 'string',
-          description: 'Node ID of the input field (optional, uses focused field if omitted)',
+          description: 'Node ID of the editable field (optional, auto-detects focused field if omitted)',
         },
       },
       required: ['text'],
