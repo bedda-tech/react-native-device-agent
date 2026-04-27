@@ -1027,6 +1027,40 @@ describe('AgentLoop', () => {
     });
   });
 
+  describe('list_apps tool', () => {
+    const installedApps = [
+      { packageName: 'com.android.settings', label: 'Settings' },
+      { packageName: 'com.google.android.apps.maps', label: 'Maps' },
+    ];
+
+    beforeEach(() => {
+      mockController.getInstalledApps.mockClear();
+      mockController.getInstalledApps.mockResolvedValue(installedApps);
+    });
+
+    it('calls getInstalledApps() and returns the result', async () => {
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"list_apps","arguments":{}}';
+          return '{"name":"task_complete","arguments":{"summary":"listed apps"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'list all apps');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'list_apps',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toEqual(installedApps);
+      expect(mockController.getInstalledApps).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('thinking extraction', () => {
     it('emits a thinking event when the provider prefixes the tool call with text', async () => {
       let call = 0;

@@ -52,6 +52,7 @@ describe('PHONE_TOOLS', () => {
       'wait',
       'find_node',
       'find_all_nodes',
+      'list_apps',
       'task_complete',
       'task_failed',
     ];
@@ -164,6 +165,14 @@ describe('read_screen and screenshot tools', () => {
   });
 });
 
+describe('list_apps tool', () => {
+  test('has no required parameters', () => {
+    const tool = getTool('list_apps');
+    expect(tool.parameters.required ?? []).toHaveLength(0);
+    expect(Object.keys(tool.parameters.properties)).toHaveLength(0);
+  });
+});
+
 describe('find_node tool', () => {
   test('has text, contentDescription, and className — all optional', () => {
     const tool = getTool('find_node');
@@ -203,10 +212,11 @@ describe('PHONE_TOOL_PRESETS', () => {
     expect(PHONE_TOOL_PRESETS.FULL).toBeUndefined();
   });
 
-  test('READ_ONLY contains read_screen and screenshot only', () => {
+  test('READ_ONLY contains read_screen, screenshot, and list_apps but no actions', () => {
     const preset = PHONE_TOOL_PRESETS.READ_ONLY;
     expect(preset).toContain('read_screen');
     expect(preset).toContain('screenshot');
+    expect(preset).toContain('list_apps');
     expect(preset).not.toContain('tap');
     expect(preset).not.toContain('swipe');
   });
