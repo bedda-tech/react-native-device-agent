@@ -23,6 +23,7 @@ let AccessibilityController: {
   ) => Promise<boolean>;
   scrollNode: (nodeId: string, direction: string) => Promise<boolean>;
   openApp: (packageName: string) => Promise<boolean>;
+  getInstalledApps: () => Promise<Array<{ packageName: string; label: string }>>;
   globalAction: (action: string) => Promise<boolean>;
   takeScreenshot: () => Promise<string>;
 } | null = null;
@@ -401,6 +402,11 @@ export class AgentLoop {
     this.registry.register(phoneTool('open_app'), async (args) => {
       const ctrl = getController();
       return ctrl.openApp(String(args.packageName));
+    });
+
+    this.registry.register(phoneTool('list_apps'), async () => {
+      const ctrl = getController();
+      return ctrl.getInstalledApps();
     });
 
     this.registry.register(phoneTool('read_screen'), async () => {

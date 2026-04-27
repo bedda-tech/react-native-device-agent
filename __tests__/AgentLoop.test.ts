@@ -19,6 +19,7 @@ const mockController = {
   swipe: jest.fn().mockResolvedValue(true),
   scrollNode: jest.fn().mockResolvedValue(true),
   openApp: jest.fn().mockResolvedValue(true),
+  getInstalledApps: jest.fn().mockResolvedValue([]),
   globalAction: jest.fn().mockResolvedValue(true),
   takeScreenshot: jest.fn().mockResolvedValue('/tmp/screen.png'),
 };

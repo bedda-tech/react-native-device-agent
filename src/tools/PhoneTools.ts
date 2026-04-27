@@ -130,6 +130,14 @@ export const PHONE_TOOLS: Tool[] = [
     },
   },
   {
+    name: 'list_apps',
+    description: 'List all user-launchable apps installed on the device. Returns an array of { packageName, label } objects. Use this when you need to find a package name before calling open_app.',
+    parameters: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
     name: 'find_node',
     description: 'Search the accessibility tree for a node by text, content description, or class name. Returns the nodeId of the first match, or null if not found. Use this before tapping to verify a node exists and get its ID.',
     parameters: {
@@ -196,7 +204,7 @@ export const PHONE_TOOL_PRESETS = {
   FULL: undefined as string[] | undefined,
 
   /** Read the screen and take screenshots only. No actions are taken. */
-  READ_ONLY: ['read_screen', 'screenshot'] as string[],
+  READ_ONLY: ['read_screen', 'screenshot', 'list_apps'] as string[],
 
   /** Navigate the phone: tap, swipe, scroll, open apps, use system buttons. No text input. */
   NAVIGATION: [
@@ -206,6 +214,7 @@ export const PHONE_TOOL_PRESETS = {
     'scroll',
     'global_action',
     'open_app',
+    'list_apps',
     'find_node',
     'find_all_nodes',
     'wait',
