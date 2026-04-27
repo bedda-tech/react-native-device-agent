@@ -9,6 +9,7 @@ import { ToolRegistry } from '../tools/ToolRegistry';
 // package can compile in environments where the native module is absent.
 let AccessibilityController: {
   getAccessibilityTree: () => Promise<unknown>;
+  performAction: (nodeId: string, action: string) => Promise<boolean>;
   tapNode: (nodeId: string) => Promise<boolean>;
   tap: (x: number, y: number) => Promise<boolean>;
   longPressNode: (nodeId: string) => Promise<boolean>;
@@ -65,6 +66,17 @@ export class AgentLoop {
   private registry: ToolRegistry;
   private tools: Tool[];
 
+  private _running = false;
+  private _step = 0;
+  private _task: string | null = null;
+
+  /** True while the agent loop is executing a task. */
+  get isRunning(): boolean { return this._running; }
+  /** Current step count (increments after each observation). */
+  get step(): number { return this._step; }
+  /** The task string passed to the most recent run() call, or null when idle. */
+  get task(): string | null { return this._task; }
+
   constructor(options: AgentOptions) {
     this.options = {
       maxSteps: 20,
@@ -93,9 +105,12 @@ export class AgentLoop {
    * @param task - Natural language description of what the user wants done
    */
   async *run(task: string): AsyncGenerator<AgentEvent> {
-    let steps = 0;
+    this._running = true;
+    this._task = task;
+    this._step = 0;
     const history: AgentEvent[] = [];
 
+    try {
     // Initial screen observation
     let screenState: string;
     try {
@@ -109,7 +124,7 @@ export class AgentLoop {
 
     const startTime = Date.now();
 
-    while (steps < this.options.maxSteps && !this.aborted) {
+    while (this._step < this.options.maxSteps && !this.aborted) {
       if (this.options.timeoutMs > 0 && Date.now() - startTime >= this.options.timeoutMs) {
         yield { type: 'timeout' };
         this.options.onTimeout?.();
@@ -145,11 +160,11 @@ export class AgentLoop {
       if (toolCalls.length === 0) {
         // No tool calls -- model may have responded with plain text.
         // Treat as a thinking step and continue.
-        steps++;
-        const obsEvent: AgentEvent = { type: 'observation', screenState, step: steps };
+        this._step++;
+        const obsEvent: AgentEvent = { type: 'observation', screenState, step: this._step };
         history.push(obsEvent);
         yield obsEvent;
-        this.options.onObservation?.({ screenState, step: steps });
+        this.options.onObservation?.({ screenState, step: this._step });
         continue;
       }
 
@@ -220,15 +235,19 @@ export class AgentLoop {
         return;
       }
 
-      steps++;
-      const obsEvent: AgentEvent = { type: 'observation', screenState, step: steps, screenshotPath };
+      this._step++;
+      const obsEvent: AgentEvent = { type: 'observation', screenState, step: this._step, screenshotPath };
       history.push(obsEvent);
       yield obsEvent;
-      this.options.onObservation?.({ screenState, step: steps });
+      this.options.onObservation?.({ screenState, step: this._step });
     }
 
     yield { type: 'max_steps_reached' };
     this.options.onMaxSteps?.();
+    } finally {
+      this._running = false;
+      this._task = null;
+    }
   }
 
   /**

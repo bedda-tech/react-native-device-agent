@@ -11,6 +11,7 @@ const mockController = {
     text: 'Home screen',
     children: [],
   }),
+  performAction: jest.fn().mockResolvedValue(true),
   tapNode: jest.fn().mockResolvedValue(true),
   tap: jest.fn().mockResolvedValue(true),
   longPressNode: jest.fn().mockResolvedValue(true),
