@@ -43,6 +43,8 @@ describe('PHONE_TOOLS', () => {
       'tap',
       'long_press',
       'type_text',
+      'clear_text',
+      'press_enter',
       'swipe',
       'scroll',
       'open_app',
@@ -112,10 +114,11 @@ describe('swipe tool', () => {
 });
 
 describe('scroll tool', () => {
-  test('requires nodeId and direction', () => {
+  test('requires direction; nodeId is optional (auto-detects scrollable)', () => {
     const tool = getTool('scroll');
-    expect(tool.parameters.required).toContain('nodeId');
     expect(tool.parameters.required).toContain('direction');
+    expect(tool.parameters.properties.nodeId?.type).toBe('string');
+    expect((tool.parameters.required ?? [])).not.toContain('nodeId');
   });
 
   test('direction is an enum of up/down/left/right', () => {
@@ -201,6 +204,22 @@ describe('task_failed tool', () => {
   });
 });
 
+describe('clear_text tool', () => {
+  test('has optional nodeId only — no required params', () => {
+    const tool = getTool('clear_text');
+    expect(tool.parameters.properties.nodeId?.type).toBe('string');
+    expect(tool.parameters.required ?? []).toHaveLength(0);
+  });
+});
+
+describe('press_enter tool', () => {
+  test('has optional nodeId only — no required params', () => {
+    const tool = getTool('press_enter');
+    expect(tool.parameters.properties.nodeId?.type).toBe('string');
+    expect(tool.parameters.required ?? []).toHaveLength(0);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // PHONE_TOOL_PRESETS
 // ---------------------------------------------------------------------------
@@ -225,11 +244,19 @@ describe('PHONE_TOOL_PRESETS', () => {
     expect(PHONE_TOOL_PRESETS.NAVIGATION).not.toContain('type_text');
   });
 
-  test('TEXT_INPUT does not contain swipe or global_action', () => {
+  test('TEXT_INPUT contains clear_text and press_enter but not swipe or global_action', () => {
     const preset = PHONE_TOOL_PRESETS.TEXT_INPUT;
+    expect(preset).toContain('clear_text');
+    expect(preset).toContain('press_enter');
     expect(preset).not.toContain('swipe');
     expect(preset).not.toContain('global_action');
     expect(preset).not.toContain('open_app');
+  });
+
+  test('IN_APP contains clear_text and press_enter', () => {
+    const preset = PHONE_TOOL_PRESETS.IN_APP;
+    expect(preset).toContain('clear_text');
+    expect(preset).toContain('press_enter');
   });
 
   test('IN_APP does not contain open_app or global_action', () => {

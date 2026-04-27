@@ -1131,6 +1131,160 @@ describe('AgentLoop', () => {
     });
   });
 
+  describe('clear_text tool', () => {
+    it('calls performAction with clearText on the provided nodeId', async () => {
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"clear_text","arguments":{"nodeId":"input-42"}}';
+          return '{"name":"task_complete","arguments":{"summary":"cleared"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      await collectEvents(loop, 'clear the search box');
+
+      expect(mockController.performAction).toHaveBeenCalledWith('input-42', 'clearText');
+    });
+
+    it('auto-detects focused editable node when nodeId is omitted', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue({
+        nodeId: 'root',
+        className: 'FrameLayout',
+        children: [
+          {
+            nodeId: 'search-field',
+            className: 'EditText',
+            text: 'old content',
+            isFocused: true,
+            isEditable: true,
+            children: [],
+          },
+        ],
+      });
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"clear_text","arguments":{}}';
+          return '{"name":"task_complete","arguments":{"summary":"cleared"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      await collectEvents(loop, 'clear the focused field');
+
+      expect(mockController.performAction).toHaveBeenCalledWith('search-field', 'clearText');
+    });
+  });
+
+  describe('press_enter tool', () => {
+    it('calls performAction with imeEnter on the provided nodeId', async () => {
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"press_enter","arguments":{"nodeId":"search-btn"}}';
+          return '{"name":"task_complete","arguments":{"summary":"submitted"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      await collectEvents(loop, 'submit the search');
+
+      expect(mockController.performAction).toHaveBeenCalledWith('search-btn', 'imeEnter');
+    });
+
+    it('auto-detects focused editable and submits it when nodeId is omitted', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue({
+        nodeId: 'root',
+        className: 'FrameLayout',
+        children: [
+          {
+            nodeId: 'url-bar',
+            className: 'EditText',
+            text: 'https://example.com',
+            isFocused: true,
+            isEditable: true,
+            children: [],
+          },
+        ],
+      });
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"press_enter","arguments":{}}';
+          return '{"name":"task_complete","arguments":{"summary":"navigated"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      await collectEvents(loop, 'navigate to url');
+
+      expect(mockController.performAction).toHaveBeenCalledWith('url-bar', 'imeEnter');
+    });
+  });
+
+  describe('scroll tool auto-detect', () => {
+    it('auto-detects the first scrollable node when nodeId is omitted', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue({
+        nodeId: 'root',
+        className: 'FrameLayout',
+        isScrollable: false,
+        children: [
+          {
+            nodeId: 'list-view',
+            className: 'RecyclerView',
+            isScrollable: true,
+            children: [],
+          },
+        ],
+      });
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"scroll","arguments":{"direction":"down"}}';
+          return '{"name":"task_complete","arguments":{"summary":"scrolled"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      await collectEvents(loop, 'scroll down the list');
+
+      expect(mockController.scrollNode).toHaveBeenCalledWith('list-view', 'down');
+    });
+
+    it('emits error when no scrollable node and no nodeId given', async () => {
+      // Default mock tree has no scrollable node
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"scroll","arguments":{"direction":"up"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'scroll on flat screen');
+
+      const errorEvent = events.find((e) => e.type === 'error');
+      expect(errorEvent).toBeDefined();
+    });
+  });
+
   describe('thinking extraction', () => {
     it('emits a thinking event when the provider prefixes the tool call with text', async () => {
       let call = 0;

@@ -48,6 +48,34 @@ export const PHONE_TOOLS: Tool[] = [
     },
   },
   {
+    name: 'clear_text',
+    description:
+      'Clear all text from an input field. If nodeId is omitted, the currently focused editable field is used. Prefer this over type_text with empty string when you want to confirm clearing.',
+    parameters: {
+      type: 'object',
+      properties: {
+        nodeId: {
+          type: 'string',
+          description: 'Node ID of the editable field (optional, auto-detects focused field if omitted)',
+        },
+      },
+    },
+  },
+  {
+    name: 'press_enter',
+    description:
+      'Press the Enter / IME action key on an input field to submit a search, send a message, or confirm input. If nodeId is omitted, the currently focused editable field is used.',
+    parameters: {
+      type: 'object',
+      properties: {
+        nodeId: {
+          type: 'string',
+          description: 'Node ID of the editable field (optional, auto-detects focused field if omitted)',
+        },
+      },
+    },
+  },
+  {
     name: 'swipe',
     description: 'Swipe between two points on the screen',
     parameters: {
@@ -64,18 +92,22 @@ export const PHONE_TOOLS: Tool[] = [
   },
   {
     name: 'scroll',
-    description: 'Scroll a scrollable element in a direction',
+    description:
+      'Scroll a scrollable element in a direction. If nodeId is omitted, the first scrollable container on screen is used automatically.',
     parameters: {
       type: 'object',
       properties: {
-        nodeId: { type: 'string', description: 'Node ID of the scrollable element' },
+        nodeId: {
+          type: 'string',
+          description: 'Node ID of the scrollable element (optional, auto-detects if omitted)',
+        },
         direction: {
           type: 'string',
           description: 'Scroll direction',
           enum: ['up', 'down', 'left', 'right'],
         },
       },
-      required: ['nodeId', 'direction'],
+      required: ['direction'],
     },
   },
   {
@@ -229,6 +261,8 @@ export const PHONE_TOOL_PRESETS = {
   TEXT_INPUT: [
     'tap',
     'type_text',
+    'clear_text',
+    'press_enter',
     'find_node',
     'find_all_nodes',
     'scroll',
@@ -243,6 +277,8 @@ export const PHONE_TOOL_PRESETS = {
     'tap',
     'long_press',
     'type_text',
+    'clear_text',
+    'press_enter',
     'swipe',
     'scroll',
     'find_node',

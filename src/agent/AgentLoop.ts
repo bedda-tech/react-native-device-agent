@@ -386,6 +386,36 @@ export class AgentLoop {
       return ctrl.setNodeText(nodeId, text);
     });
 
+    this.registry.register(phoneTool('clear_text'), async (args) => {
+      const ctrl = getController();
+      let nodeId = args.nodeId ? String(args.nodeId) : null;
+      if (!nodeId) {
+        const tree = await ctrl.getAccessibilityTree();
+        nodeId = findFocusedEditableNode(tree);
+        if (!nodeId) {
+          throw new Error(
+            'clear_text: no focused editable field found. Tap the target input first, or provide a nodeId.',
+          );
+        }
+      }
+      return ctrl.performAction(nodeId, 'clearText');
+    });
+
+    this.registry.register(phoneTool('press_enter'), async (args) => {
+      const ctrl = getController();
+      let nodeId = args.nodeId ? String(args.nodeId) : null;
+      if (!nodeId) {
+        const tree = await ctrl.getAccessibilityTree();
+        nodeId = findFocusedEditableNode(tree);
+        if (!nodeId) {
+          throw new Error(
+            'press_enter: no focused editable field found. Tap the target input first, or provide a nodeId.',
+          );
+        }
+      }
+      return ctrl.performAction(nodeId, 'imeEnter');
+    });
+
     this.registry.register(phoneTool('swipe'), async (args) => {
       const ctrl = getController();
       return ctrl.swipe(
@@ -399,7 +429,17 @@ export class AgentLoop {
 
     this.registry.register(phoneTool('scroll'), async (args) => {
       const ctrl = getController();
-      return ctrl.scrollNode(String(args.nodeId), String(args.direction));
+      let nodeId = args.nodeId ? String(args.nodeId) : null;
+      if (!nodeId) {
+        const tree = await ctrl.getAccessibilityTree();
+        nodeId = findFirstScrollableNode(tree);
+        if (!nodeId) {
+          throw new Error(
+            'scroll: no scrollable element found on screen. Provide a nodeId or ensure the screen has a scrollable container.',
+          );
+        }
+      }
+      return ctrl.scrollNode(nodeId, String(args.direction));
     });
 
     this.registry.register(phoneTool('open_app'), async (args) => {
@@ -579,6 +619,29 @@ function searchFocusedEditable(nodes: Record<string, unknown>[]): string | null 
       ? (node.children as Record<string, unknown>[])
       : [];
     const found = searchFocusedEditable(children);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
+ * Find the nodeId of the first scrollable node in the accessibility tree.
+ * Returns null if no scrollable node exists.
+ */
+function findFirstScrollableNode(tree: unknown): string | null {
+  const roots = Array.isArray(tree) ? tree : [tree];
+  return searchScrollable(roots as Record<string, unknown>[]);
+}
+
+function searchScrollable(nodes: Record<string, unknown>[]): string | null {
+  for (const node of nodes) {
+    if (node.isScrollable === true) {
+      return typeof node.nodeId === 'string' ? node.nodeId : null;
+    }
+    const children = Array.isArray(node.children)
+      ? (node.children as Record<string, unknown>[])
+      : [];
+    const found = searchScrollable(children);
     if (found) return found;
   }
   return null;
