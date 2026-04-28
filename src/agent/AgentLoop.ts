@@ -242,8 +242,10 @@ export class AgentLoop {
       this.options.onObservation?.({ screenState, step: this._step });
     }
 
-    yield { type: 'max_steps_reached' };
-    this.options.onMaxSteps?.();
+    if (!this.aborted) {
+      yield { type: 'max_steps_reached' };
+      this.options.onMaxSteps?.();
+    }
     } finally {
       this._running = false;
       this._task = null;
