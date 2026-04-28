@@ -351,6 +351,101 @@ describe('TaskPlanner', () => {
     });
   });
 
+  describe('subtask failed and timeout handling', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it('emits subtask_error when subtask calls task_failed, then continues to complete', async () => {
+      // First subtask calls task_failed; second subtask completes normally.
+      let callCount = 0;
+      const provider: LLMProviderInterface = {
+        async generate(_prompt: string): Promise<string> {
+          return '1. Failing step\n2. Success step';
+        },
+        async generateWithTools(_prompt: string, _tools: Tool[]): Promise<string> {
+          callCount++;
+          if (callCount === 1) {
+            // First subtask's AgentLoop: signal failure
+            return '{"name":"task_failed","arguments":{"reason":"Cannot proceed."}}';
+          }
+          // Second subtask's AgentLoop: complete normally
+          return '{"name":"task_complete","arguments":{"summary":"step 2 done"}}';
+        },
+      };
+
+      const planner = new TaskPlanner({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(planner, 'Two step task');
+
+      const subtaskErrors = events.filter((e) => e.type === 'subtask_error');
+      expect(subtaskErrors).toHaveLength(1);
+      expect(
+        (subtaskErrors[0] as unknown as { error: Error }).error.message,
+      ).toBe('Cannot proceed.');
+
+      // Second subtask should still complete
+      const subtaskCompletes = events.filter((e) => e.type === 'subtask_complete');
+      expect(subtaskCompletes).toHaveLength(1);
+
+      // Planner still emits a final complete event
+      expect(events.find((e) => e.type === 'complete')).toBeDefined();
+    });
+
+    it('emits subtask_error when subtask times out, then continues to complete', async () => {
+      let dateCalls = 0;
+      jest.spyOn(Date, 'now').mockImplementation(() => {
+        dateCalls++;
+        // AgentLoop 1: call 1 = startTime (0), call 2 = timeout check (10_000) → fires
+        // AgentLoop 2+: all remaining calls return 0 → no timeout
+        if (dateCalls === 1) return 0;
+        if (dateCalls === 2) return 10_000;
+        return 0;
+      });
+
+      let callCount = 0;
+      const provider: LLMProviderInterface = {
+        async generate(_prompt: string): Promise<string> {
+          return '1. Timing out step\n2. Fast step';
+        },
+        async generateWithTools(_prompt: string, _tools: Tool[]): Promise<string> {
+          callCount++;
+          if (callCount <= 1) {
+            // First subtask's AgentLoop: keep running (tap) so timeout check fires
+            return '{"name":"tap","arguments":{"nodeId":"x"}}';
+          }
+          return '{"name":"task_complete","arguments":{"summary":"step 2 done"}}';
+        },
+      };
+
+      const planner = new TaskPlanner({ provider, maxSteps: 5, settleMs: 0, timeoutMs: 5000 });
+      const events = await collectEvents(planner, 'Timeout task');
+
+      const subtaskErrors = events.filter((e) => e.type === 'subtask_error');
+      expect(subtaskErrors).toHaveLength(1);
+      expect(
+        (subtaskErrors[0] as unknown as { error: Error }).error.message,
+      ).toBe('Subtask timed out.');
+
+      // Second subtask should still run
+      expect(events.find((e) => e.type === 'complete')).toBeDefined();
+    });
+
+    it('does not incorrectly emit subtask_complete when task_failed is called', async () => {
+      const provider: LLMProviderInterface = {
+        async generate(_prompt: string): Promise<string> {
+          return '1. The only step';
+        },
+        async generateWithTools(_prompt: string, _tools: Tool[]): Promise<string> {
+          return '{"name":"task_failed","arguments":{"reason":"blocked"}}';
+        },
+      };
+
+      const planner = new TaskPlanner({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(planner, 'Single failing task');
+
+      expect(events.filter((e) => e.type === 'subtask_complete')).toHaveLength(0);
+      expect(events.filter((e) => e.type === 'subtask_error')).toHaveLength(1);
+    });
+  });
+
   describe('subtask parsing', () => {
     it('parses numbered list with dot separator (1. text)', async () => {
       const provider = makeDecomposeProvider('1. Open app\n2. Tap button');

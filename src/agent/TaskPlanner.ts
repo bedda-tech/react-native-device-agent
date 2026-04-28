@@ -149,6 +149,14 @@ export class TaskPlanner {
             hadError = true;
             yield { type: 'subtask_error', subtask, error: event.error };
             break;
+          } else if (event.type === 'failed') {
+            hadError = true;
+            yield { type: 'subtask_error', subtask, error: new Error(event.reason) };
+            break;
+          } else if (event.type === 'timeout') {
+            hadError = true;
+            yield { type: 'subtask_error', subtask, error: new Error('Subtask timed out.') };
+            break;
           } else if (event.type === 'max_steps_reached') {
             subtaskResult = `Step limit reached for: ${subtask.description}`;
           }
