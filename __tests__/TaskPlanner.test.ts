@@ -290,6 +290,67 @@ describe('TaskPlanner', () => {
     });
   });
 
+  describe('abort()', () => {
+    it('skips remaining subtasks after abort() is called between subtasks', async () => {
+      const provider = makeDecomposeProvider('1. First step\n2. Second step\n3. Third step');
+      const planner = new TaskPlanner({ provider, maxSteps: 5, settleMs: 0 });
+
+      const events: Array<{ type: string } & Record<string, unknown>> = [];
+      let aborted = false;
+      for await (const event of planner.run('Three step task')) {
+        events.push(event as typeof events[0]);
+        // Abort after the first subtask completes — second and third should be skipped
+        if (event.type === 'subtask_complete' && !aborted) {
+          aborted = true;
+          planner.abort();
+        }
+      }
+
+      const startEvents = events.filter((e) => e.type === 'subtask_start');
+      expect(startEvents).toHaveLength(1);
+    });
+
+    it('still emits a complete event after abort', async () => {
+      const provider = makeDecomposeProvider('1. Step one\n2. Step two\n3. Step three');
+      const planner = new TaskPlanner({ provider, maxSteps: 5, settleMs: 0 });
+
+      const events: Array<{ type: string } & Record<string, unknown>> = [];
+      let aborted = false;
+      for await (const event of planner.run('Abort mid-run')) {
+        events.push(event as typeof events[0]);
+        if (event.type === 'subtask_complete' && !aborted) {
+          aborted = true;
+          planner.abort();
+        }
+      }
+
+      expect(events.find((e) => e.type === 'complete')).toBeDefined();
+    });
+
+    it('can be restarted with a fresh run() after abort', async () => {
+      const provider = makeDecomposeProvider('1. Step A\n2. Step B');
+      const planner = new TaskPlanner({ provider, maxSteps: 5, settleMs: 0 });
+
+      // First run — abort after plan
+      let events1: Array<{ type: string } & Record<string, unknown>> = [];
+      let aborted = false;
+      for await (const event of planner.run('First run')) {
+        events1.push(event as typeof events1[0]);
+        if (event.type === 'subtask_complete' && !aborted) {
+          aborted = true;
+          planner.abort();
+        }
+      }
+
+      // Second run — should run to completion without being pre-aborted
+      const events2 = await collectEvents(planner, 'Second run');
+      const completeEvent = events2.find((e) => e.type === 'complete');
+      expect(completeEvent).toBeDefined();
+      // Both subtasks should have run
+      expect(events2.filter((e) => e.type === 'subtask_start')).toHaveLength(2);
+    });
+  });
+
   describe('subtask parsing', () => {
     it('parses numbered list with dot separator (1. text)', async () => {
       const provider = makeDecomposeProvider('1. Open app\n2. Tap button');

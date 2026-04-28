@@ -75,12 +75,23 @@ Example output:
  */
 export class TaskPlanner {
   private options: TaskPlannerOptions & { maxSubTasks: number };
+  private _aborted = false;
+  private _currentLoop: AgentLoop | null = null;
 
   constructor(options: TaskPlannerOptions) {
     this.options = {
       maxSubTasks: 5,
       ...options,
     };
+  }
+
+  /**
+   * Abort the currently-running subtask and prevent any further subtasks from
+   * starting. Safe to call before, during, or after `run()`.
+   */
+  abort(): void {
+    this._aborted = true;
+    this._currentLoop?.abort();
   }
 
   /**
@@ -96,6 +107,8 @@ export class TaskPlanner {
    *  - 'error'            if decomposition itself fails
    */
   async *run(task: string): AsyncGenerator<PlannerEvent> {
+    this._aborted = false;
+
     // Step 1: Decompose into subtasks
     let subtasks: SubTask[];
     try {
@@ -117,9 +130,12 @@ export class TaskPlanner {
     const results: string[] = [];
 
     for (const subtask of subtasks) {
+      if (this._aborted) break;
+
       yield { type: 'subtask_start', subtask };
 
       const loop = new AgentLoop(this.options);
+      this._currentLoop = loop;
       let subtaskResult = '';
       let hadError = false;
 
@@ -141,9 +157,11 @@ export class TaskPlanner {
         hadError = true;
         const error = err instanceof Error ? err : new Error(String(err));
         yield { type: 'subtask_error', subtask, error };
+      } finally {
+        this._currentLoop = null;
       }
 
-      if (!hadError) {
+      if (!hadError && !this._aborted) {
         const result = subtaskResult || `Completed: ${subtask.description}`;
         results.push(result);
         yield { type: 'subtask_complete', subtask, result };
