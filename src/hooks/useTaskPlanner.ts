@@ -15,7 +15,7 @@ export interface UseTaskPlannerState {
   events: PlannerEvent[];
   /** Start executing a high-level task. */
   execute: (task: string) => Promise<void>;
-  /** Stop the planner after the current subtask finishes. */
+  /** Abort the planner and the currently running subtask immediately. */
   stop: () => void;
 }
 
@@ -43,6 +43,7 @@ export function useTaskPlanner(options: TaskPlannerOptions): UseTaskPlannerState
   const [events, setEvents] = useState<PlannerEvent[]>([]);
 
   const stoppedRef = useRef(false);
+  const plannerRef = useRef<TaskPlanner | null>(null);
   const optionsRef = useRef(options);
   // Keep options current without re-creating execute on every render.
   optionsRef.current = options;
@@ -56,6 +57,7 @@ export function useTaskPlanner(options: TaskPlannerOptions): UseTaskPlannerState
     setEvents([]);
 
     const planner = new TaskPlanner(optionsRef.current);
+    plannerRef.current = planner;
 
     try {
       for await (const event of planner.run(task)) {
@@ -80,6 +82,7 @@ export function useTaskPlanner(options: TaskPlannerOptions): UseTaskPlannerState
       const err = error instanceof Error ? error : new Error(String(error));
       setEvents((prev) => [...prev, { type: 'error', error: err }]);
     } finally {
+      plannerRef.current = null;
       setIsRunning(false);
       setCurrentSubtask(null);
     }
@@ -87,6 +90,7 @@ export function useTaskPlanner(options: TaskPlannerOptions): UseTaskPlannerState
 
   const stop = useCallback(() => {
     stoppedRef.current = true;
+    plannerRef.current?.abort();
   }, []);
 
   return { isRunning, plan, currentSubtask, results, events, execute, stop };
