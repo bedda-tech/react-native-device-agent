@@ -1,6 +1,6 @@
 import type { Tool } from '../types';
 import { LLMProvider } from './LLMProvider';
-import { toOpenAIFunction } from '../tools/ToolSchema';
+import { toOpenAIFunction, toAnthropicTool } from '../tools/ToolSchema';
 
 /**
  * Cloud LLM provider for fallback when on-device inference is insufficient.
@@ -100,6 +100,26 @@ export class CloudProvider extends LLMProvider {
     return this.options.apiFormat === 'anthropic'
       ? this.anthropicGenerateWithTools(prompt, tools)
       : this.openaiGenerateWithTools(prompt, tools);
+  }
+
+  /**
+   * Generate a response with tool-calling support and a screenshot image.
+   *
+   * Reads the image from `imagePath` (a local file path, possibly with a
+   * `file://` prefix), encodes it as base64, and injects it into the API
+   * request using the provider's native vision format.
+   *
+   * Falls back to `generateWithTools` if the image cannot be read.
+   */
+  async generateWithVision(prompt: string, tools: Tool[], imagePath: string): Promise<string> {
+    try {
+      const { data: imageBase64, mimeType } = await this.readImageAsBase64(imagePath);
+      return this.options.apiFormat === 'anthropic'
+        ? this.anthropicGenerateWithVision(prompt, tools, imageBase64, mimeType)
+        : this.openaiGenerateWithVision(prompt, tools, imageBase64, mimeType);
+    } catch {
+      return this.generateWithTools(prompt, tools);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -232,6 +252,134 @@ export class CloudProvider extends LLMProvider {
     }
 
     return '';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Vision implementations
+  // ---------------------------------------------------------------------------
+
+  private async openaiGenerateWithVision(
+    prompt: string,
+    tools: Tool[],
+    imageBase64: string,
+    mimeType: string,
+  ): Promise<string> {
+    const openaiTools = tools.map(toOpenAIFunction);
+    const messages: unknown[] = [
+      ...(this.options.system ? [{ role: 'system', content: this.options.system }] : []),
+      {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+          { type: 'text', text: prompt },
+        ],
+      },
+    ];
+
+    const response = await this.fetchJson(`${this.options.baseUrl}/chat/completions`, {
+      model: this.options.model,
+      messages,
+      tools: openaiTools,
+      tool_choice: 'auto',
+      max_tokens: this.options.maxTokens,
+      temperature: this.options.temperature,
+    });
+
+    const choices = response?.choices as Array<{ message?: { content?: string; tool_calls?: unknown[] } }> | undefined;
+    const message = choices?.[0]?.message;
+    if (!message) return '';
+
+    if (message.tool_calls && Array.isArray(message.tool_calls)) {
+      const calls = message.tool_calls.map((tc: unknown) => {
+        const tcObj = tc as Record<string, unknown>;
+        let args: Record<string, unknown> = {};
+        const fn = tcObj.function as Record<string, unknown> | undefined;
+        if (fn?.arguments && typeof fn.arguments === 'string') {
+          try { args = JSON.parse(fn.arguments); } catch { args = {}; }
+        }
+        return { name: fn?.name, arguments: args };
+      });
+      return JSON.stringify(calls);
+    }
+
+    return message.content ?? '';
+  }
+
+  private async anthropicGenerateWithVision(
+    prompt: string,
+    tools: Tool[],
+    imageBase64: string,
+    mimeType: string,
+  ): Promise<string> {
+    const anthropicTools = tools.map(toAnthropicTool);
+    const body: Record<string, unknown> = {
+      model: this.options.model,
+      max_tokens: this.options.maxTokens,
+      tools: anthropicTools,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mimeType, data: imageBase64 } },
+            { type: 'text', text: prompt },
+          ],
+        },
+      ],
+    };
+    if (this.options.system) body.system = this.options.system;
+
+    const response = await this.fetchJson(
+      `${this.options.baseUrl}/messages`,
+      body,
+      { 'x-api-key': this.options.apiKey, 'anthropic-version': '2023-06-01' },
+    );
+
+    if (Array.isArray(response?.content)) {
+      const toolBlocks = response.content.filter(
+        (b: Record<string, unknown>) => b.type === 'tool_use',
+      );
+      if (toolBlocks.length > 0) {
+        const calls = toolBlocks.map((b: Record<string, unknown>) => ({
+          name: b.name,
+          arguments: b.input ?? {},
+        }));
+        return JSON.stringify(calls);
+      }
+      const textBlock = response.content.find(
+        (b: Record<string, unknown>) => b.type === 'text',
+      );
+      return (textBlock as Record<string, unknown> | undefined)?.text as string ?? '';
+    }
+
+    return '';
+  }
+
+  /**
+   * Read a local image file and return it as a base64 string.
+   * Accepts both plain paths and `file://` URIs.
+   */
+  private async readImageAsBase64(
+    imagePath: string,
+  ): Promise<{ data: string; mimeType: string }> {
+    const fileUri = imagePath.startsWith('file://') ? imagePath : `file://${imagePath}`;
+    const lower = imagePath.toLowerCase();
+    const mimeType = lower.endsWith('.jpg') || lower.endsWith('.jpeg') ? 'image/jpeg' : 'image/png';
+
+    const response = await fetch(fileUri);
+    if (!response.ok) throw new Error(`readImageAsBase64: HTTP ${response.status}`);
+    const blob = await response.blob();
+
+    return new Promise<{ data: string; mimeType: string }>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        const base64 = dataUrl.split(',')[1];
+        if (!base64) { reject(new Error('readImageAsBase64: no base64 data')); return; }
+        resolve({ data: base64, mimeType });
+      };
+      reader.onerror = () => reject(reader.error ?? new Error('FileReader error'));
+      reader.readAsDataURL(blob);
+    });
   }
 
   // ---------------------------------------------------------------------------

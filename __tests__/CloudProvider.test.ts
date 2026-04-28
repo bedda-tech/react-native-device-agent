@@ -436,3 +436,118 @@ describe('CloudProvider system prompt', () => {
     expect(body.system).toBe('Agent prompt');
   });
 });
+
+// ---------------------------------------------------------------------------
+// generateWithVision
+// ---------------------------------------------------------------------------
+
+const FAKE_BASE64 = 'abc123fakebase64imagedata';
+
+class MockFileReader {
+  result: string | null = null;
+  onloadend: (() => void) | null = null;
+  onerror: ((e: unknown) => void) | null = null;
+
+  readAsDataURL(_blob: unknown) {
+    this.result = `data:image/png;base64,${FAKE_BASE64}`;
+    Promise.resolve().then(() => this.onloadend?.());
+  }
+}
+
+describe('CloudProvider generateWithVision (OpenAI)', () => {
+  const provider = new CloudProvider({
+    apiKey: 'test-key',
+    model: 'gpt-4o',
+    apiFormat: 'openai',
+  });
+
+  beforeEach(() => {
+    global.FileReader = MockFileReader as unknown as typeof FileReader;
+    // fetch call 1: file read; fetch call 2: API
+    (global.fetch as jest.Mock) = jest.fn()
+      .mockImplementationOnce(() => Promise.resolve({ ok: true, blob: () => Promise.resolve({}) }))
+      .mockImplementationOnce(() => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ choices: [{ message: { content: 'vision ok' } }] }),
+        text: () => Promise.resolve(''),
+      }));
+  });
+
+  afterEach(() => { jest.restoreAllMocks(); });
+
+  test('sends image_url content block with correct base64 data URL', async () => {
+    const result = await provider.generateWithVision('Describe screen', [SAMPLE_TOOL], '/data/screenshot.png');
+    expect(result).toBe('vision ok');
+
+    const apiCall = (global.fetch as jest.Mock).mock.calls[1];
+    const body = JSON.parse(apiCall[1].body);
+    const userMsg = body.messages.find((m: { role: string }) => m.role === 'user');
+    const imageBlock = userMsg.content.find((c: { type: string }) => c.type === 'image_url');
+    expect(imageBlock.image_url.url).toBe(`data:image/png;base64,${FAKE_BASE64}`);
+  });
+
+  test('falls back to generateWithTools when image read fails', async () => {
+    // Make the file fetch fail
+    (global.fetch as jest.Mock) = jest.fn()
+      .mockImplementationOnce(() => Promise.reject(new Error('file not found')))
+      .mockImplementationOnce(() => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ choices: [{ message: { content: 'fallback' } }] }),
+        text: () => Promise.resolve(''),
+      }));
+
+    const result = await provider.generateWithVision('Describe screen', [SAMPLE_TOOL], '/bad/path.png');
+    expect(result).toBe('fallback');
+  });
+});
+
+describe('CloudProvider generateWithVision (Anthropic)', () => {
+  const provider = new CloudProvider({
+    apiKey: 'test-key',
+    model: 'claude-sonnet-4-6',
+    apiFormat: 'anthropic',
+    baseUrl: 'https://api.anthropic.com/v1',
+  });
+
+  beforeEach(() => {
+    global.FileReader = MockFileReader as unknown as typeof FileReader;
+    (global.fetch as jest.Mock) = jest.fn()
+      .mockImplementationOnce(() => Promise.resolve({ ok: true, blob: () => Promise.resolve({}) }))
+      .mockImplementationOnce(() => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ content: [{ type: 'text', text: 'vision anthropic' }] }),
+        text: () => Promise.resolve(''),
+      }));
+  });
+
+  afterEach(() => { jest.restoreAllMocks(); });
+
+  test('sends image base64 source block in Anthropic content format', async () => {
+    const result = await provider.generateWithVision('Describe screen', [SAMPLE_TOOL], '/data/screenshot.png');
+    expect(result).toBe('vision anthropic');
+
+    const apiCall = (global.fetch as jest.Mock).mock.calls[1];
+    const body = JSON.parse(apiCall[1].body);
+    const content = body.messages[0].content;
+    const imageBlock = content.find((c: { type: string }) => c.type === 'image');
+    expect(imageBlock.source.type).toBe('base64');
+    expect(imageBlock.source.data).toBe(FAKE_BASE64);
+    expect(imageBlock.source.media_type).toBe('image/png');
+  });
+
+  test('serializes tool_use blocks from vision response', async () => {
+    (global.fetch as jest.Mock) = jest.fn()
+      .mockImplementationOnce(() => Promise.resolve({ ok: true, blob: () => Promise.resolve({}) }))
+      .mockImplementationOnce(() => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          content: [{ type: 'tool_use', name: 'tap', input: { nodeId: 'n5' } }],
+        }),
+        text: () => Promise.resolve(''),
+      }));
+
+    const result = await provider.generateWithVision('Tap button', [SAMPLE_TOOL], '/data/screenshot.png');
+    const parsed = JSON.parse(result);
+    expect(parsed[0]).toEqual({ name: 'tap', arguments: { nodeId: 'n5' } });
+  });
+});
