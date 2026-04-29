@@ -54,6 +54,8 @@ describe('PHONE_TOOLS', () => {
       'wait',
       'find_node',
       'find_all_nodes',
+      'wait_for_node',
+      'get_node_text',
       'list_apps',
       'task_complete',
       'task_failed',

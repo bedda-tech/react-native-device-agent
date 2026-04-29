@@ -30,6 +30,9 @@ export function useAgent(options: AgentOptions): UseAgentState {
     optionsRef.current = options;
   });
 
+  // Abort any in-flight loop when the component unmounts.
+  useEffect(() => () => { loopRef.current?.abort(); }, []);
+
   const execute = useCallback(async (task: string) => {
     setIsRunning(true);
     setHistory([]);

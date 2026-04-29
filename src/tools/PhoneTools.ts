@@ -195,6 +195,33 @@ export const PHONE_TOOLS: Tool[] = [
     },
   },
   {
+    name: 'wait_for_node',
+    description:
+      'Poll the accessibility tree until a node matching the query appears, then return its nodeId. Returns null if the timeout expires before the node is found. Use after actions that trigger async UI changes (e.g. navigation, loading screens).',
+    parameters: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Substring to match against node text (case-sensitive)' },
+        contentDescription: { type: 'string', description: 'Substring to match against node content description' },
+        className: { type: 'string', description: 'Exact class name to match (e.g. android.widget.Button)' },
+        timeoutMs: { type: 'number', description: 'Maximum wait time in milliseconds (default 5000)' },
+        intervalMs: { type: 'number', description: 'Poll interval in milliseconds (default 500)' },
+      },
+    },
+  },
+  {
+    name: 'get_node_text',
+    description:
+      'Get the text content and content description of a specific node by its ID. More efficient than read_screen when you only need the value of one element (e.g. to verify a field value or read a label).',
+    parameters: {
+      type: 'object',
+      properties: {
+        nodeId: { type: 'string', description: 'Accessibility node ID to read text from' },
+      },
+      required: ['nodeId'],
+    },
+  },
+  {
     name: 'task_complete',
     description: 'Signal that the task has been completed successfully',
     parameters: {
@@ -251,6 +278,8 @@ export const PHONE_TOOL_PRESETS = {
     'find_node',
     'find_all_nodes',
     'wait',
+    'wait_for_node',
+    'get_node_text',
     'read_screen',
   ] as string[],
 
@@ -265,6 +294,8 @@ export const PHONE_TOOL_PRESETS = {
     'press_enter',
     'find_node',
     'find_all_nodes',
+    'wait_for_node',
+    'get_node_text',
     'scroll',
     'read_screen',
   ] as string[],
@@ -284,6 +315,8 @@ export const PHONE_TOOL_PRESETS = {
     'find_node',
     'find_all_nodes',
     'wait',
+    'wait_for_node',
+    'get_node_text',
     'read_screen',
     'screenshot',
   ] as string[],

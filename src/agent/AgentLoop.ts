@@ -517,6 +517,35 @@ export class AgentLoop {
       return true;
     });
 
+    this.registry.register(phoneTool('wait_for_node'), async (args) => {
+      const ctrl = getController();
+      const timeoutMs = args.timeoutMs !== undefined ? Number(args.timeoutMs) : 5000;
+      const intervalMs = args.intervalMs !== undefined ? Number(args.intervalMs) : 500;
+      const query = {
+        text: args.text !== undefined ? String(args.text) : undefined,
+        contentDescription: args.contentDescription !== undefined
+          ? String(args.contentDescription)
+          : undefined,
+        className: args.className !== undefined ? String(args.className) : undefined,
+      };
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        const tree = await ctrl.getAccessibilityTree();
+        const nodeId = findNodeInTree(tree, query);
+        if (nodeId !== null) return nodeId;
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) break;
+        await this.delay(Math.min(intervalMs, remaining));
+      }
+      return null;
+    });
+
+    this.registry.register(phoneTool('get_node_text'), async (args) => {
+      const ctrl = getController();
+      const tree = await ctrl.getAccessibilityTree();
+      return getNodeTextById(tree, String(args.nodeId));
+    });
+
     // task_complete and task_failed are handled specially in the loop, but
     // register no-ops so registry.has() returns true for both.
     this.registry.register(phoneTool('task_complete'), async () => true);
@@ -620,6 +649,38 @@ function gatherNodes(
       : [];
     gatherNodes(children, query, results);
   }
+}
+
+/**
+ * Find a specific node by its nodeId and return its text/contentDescription.
+ * Returns null if the node is not found.
+ */
+function getNodeTextById(
+  tree: unknown,
+  nodeId: string,
+): { text: string | null; contentDescription: string | null } | null {
+  const roots = Array.isArray(tree) ? tree : [tree];
+  return findNodeById(roots as Record<string, unknown>[], nodeId);
+}
+
+function findNodeById(
+  nodes: Record<string, unknown>[],
+  nodeId: string,
+): { text: string | null; contentDescription: string | null } | null {
+  for (const node of nodes) {
+    if (node.nodeId === nodeId) {
+      return {
+        text: typeof node.text === 'string' ? node.text : null,
+        contentDescription: typeof node.contentDescription === 'string' ? node.contentDescription : null,
+      };
+    }
+    const children = Array.isArray(node.children)
+      ? (node.children as Record<string, unknown>[])
+      : [];
+    const found = findNodeById(children, nodeId);
+    if (found !== null) return found;
+  }
+  return null;
 }
 
 /**
