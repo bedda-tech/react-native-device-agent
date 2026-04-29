@@ -198,6 +198,26 @@ describe('find_all_nodes tool', () => {
   });
 });
 
+describe('wait_for_node tool', () => {
+  test('has text, contentDescription, className, timeoutMs, intervalMs — all optional', () => {
+    const tool = getTool('wait_for_node');
+    expect(tool.parameters.properties.text?.type).toBe('string');
+    expect(tool.parameters.properties.contentDescription?.type).toBe('string');
+    expect(tool.parameters.properties.className?.type).toBe('string');
+    expect(tool.parameters.properties.timeoutMs?.type).toBe('number');
+    expect(tool.parameters.properties.intervalMs?.type).toBe('number');
+    expect(tool.parameters.required).toBeUndefined();
+  });
+});
+
+describe('get_node_text tool', () => {
+  test('requires nodeId', () => {
+    const tool = getTool('get_node_text');
+    expect(tool.parameters.required).toContain('nodeId');
+    expect(tool.parameters.properties.nodeId?.type).toBe('string');
+  });
+});
+
 describe('task_failed tool', () => {
   test('requires reason', () => {
     const tool = getTool('task_failed');

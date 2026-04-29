@@ -1028,6 +1028,173 @@ describe('AgentLoop', () => {
     });
   });
 
+  describe('wait_for_node tool', () => {
+    it('returns nodeId when node is present on first poll', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue([
+        {
+          nodeId: 'root',
+          text: null,
+          contentDescription: null,
+          className: 'FrameLayout',
+          children: [
+            { nodeId: 'loaded-btn', text: 'Submit', contentDescription: null, className: 'Button', children: [] },
+          ],
+        },
+      ]);
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"wait_for_node","arguments":{"text":"Submit","timeoutMs":5000,"intervalMs":0}}';
+          return '{"name":"task_complete","arguments":{"summary":"found"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'wait for submit button');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'wait_for_node',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBe('loaded-btn');
+    });
+
+    it('returns null when timeout expires before node appears', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue([
+        { nodeId: 'root', text: null, contentDescription: null, className: 'FrameLayout', children: [] },
+      ]);
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"wait_for_node","arguments":{"text":"Missing","timeoutMs":0}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'wait for missing node');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'wait_for_node',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBeNull();
+    });
+
+    it('polls until node appears on a later iteration', async () => {
+      let treeCalls = 0;
+      mockController.getAccessibilityTree.mockImplementation(async () => {
+        treeCalls++;
+        if (treeCalls < 3) {
+          return [{ nodeId: 'root', text: null, contentDescription: null, className: 'View', children: [] }];
+        }
+        return [
+          {
+            nodeId: 'root',
+            text: null,
+            contentDescription: null,
+            className: 'View',
+            children: [
+              { nodeId: 'dynamic-node', text: 'Loaded', contentDescription: null, className: 'TextView', children: [] },
+            ],
+          },
+        ];
+      });
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"wait_for_node","arguments":{"text":"Loaded","timeoutMs":10000,"intervalMs":0}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'wait for dynamic node');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'wait_for_node',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBe('dynamic-node');
+      expect(treeCalls).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  describe('get_node_text tool', () => {
+    it('returns text and contentDescription of a node by ID', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue([
+        {
+          nodeId: 'root',
+          text: null,
+          contentDescription: null,
+          className: 'FrameLayout',
+          children: [
+            {
+              nodeId: 'label-42',
+              text: 'Hello World',
+              contentDescription: 'Greeting label',
+              className: 'TextView',
+              children: [],
+            },
+          ],
+        },
+      ]);
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"get_node_text","arguments":{"nodeId":"label-42"}}';
+          return '{"name":"task_complete","arguments":{"summary":"read label"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'read label text');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'get_node_text',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toEqual({ text: 'Hello World', contentDescription: 'Greeting label' });
+    });
+
+    it('returns null when the nodeId does not exist in the tree', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue([
+        { nodeId: 'root', text: 'Home', contentDescription: null, className: 'FrameLayout', children: [] },
+      ]);
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"get_node_text","arguments":{"nodeId":"nonexistent-99"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'get text of missing node');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'get_node_text',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBeNull();
+    });
+  });
+
   describe('list_apps tool', () => {
     const installedApps = [
       { packageName: 'com.android.settings', label: 'Settings' },
