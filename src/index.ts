@@ -34,6 +34,8 @@ export type { SubTask, PlannerEvent, TaskPlannerOptions } from './agent/TaskPlan
 
 export { ToolRegistry } from './tools/ToolRegistry';
 export { PHONE_TOOLS, PHONE_TOOL_PRESETS } from './tools/PhoneTools';
+export { toOpenAIFunction, toAnthropicTool, toGemmaFunction, validateArgs } from './tools/ToolSchema';
+export { ToolBuilder } from './tools/ToolBuilder';
 
 // ---------------------------------------------------------------------------
 // Providers
