@@ -2001,4 +2001,157 @@ describe('AgentLoop', () => {
       expect(capturedLengths[0]).toBe(1);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // context injection
+  // ---------------------------------------------------------------------------
+
+  describe('context injection', () => {
+    it('includes context key-value pairs in the prompt', async () => {
+      const capturedPrompts: string[] = [];
+      const provider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools(prompt): Promise<string> {
+          capturedPrompts.push(prompt);
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider,
+        settleMs: 0,
+        context: { username: 'Matt', language: 'Spanish' },
+      });
+      await collectEvents(loop, 'context test task');
+
+      expect(capturedPrompts[0]).toContain('username: Matt');
+      expect(capturedPrompts[0]).toContain('language: Spanish');
+    });
+
+    it('omits the context section when context is empty', async () => {
+      const capturedPrompts: string[] = [];
+      const provider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools(prompt): Promise<string> {
+          capturedPrompts.push(prompt);
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, settleMs: 0, context: {} });
+      await collectEvents(loop, 'no context task');
+
+      expect(capturedPrompts[0]).not.toContain('Context:');
+    });
+
+    it('omits the context section when context is not provided', async () => {
+      const capturedPrompts: string[] = [];
+      const provider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools(prompt): Promise<string> {
+          capturedPrompts.push(prompt);
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, settleMs: 0 });
+      await collectEvents(loop, 'no context option');
+
+      expect(capturedPrompts[0]).not.toContain('Context:');
+    });
+
+    it('injects context label header when at least one key is present', async () => {
+      const capturedPrompts: string[] = [];
+      const provider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools(prompt): Promise<string> {
+          capturedPrompts.push(prompt);
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider,
+        settleMs: 0,
+        context: { role: 'admin' },
+      });
+      await collectEvents(loop, 'single context key');
+
+      expect(capturedPrompts[0]).toContain('Context:');
+      expect(capturedPrompts[0]).toContain('role: admin');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // onProgress callback
+  // ---------------------------------------------------------------------------
+
+  describe('onProgress callback', () => {
+    it('fires with step and maxSteps after each observation', async () => {
+      const progressCalls: Array<[number, number]> = [];
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"tap","arguments":{"nodeId":"x"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider,
+        settleMs: 0,
+        maxSteps: 10,
+        onProgress: (step, maxSteps) => progressCalls.push([step, maxSteps]),
+      });
+      await collectEvents(loop, 'progress callback test');
+
+      expect(progressCalls.length).toBeGreaterThan(0);
+      expect(progressCalls[0]).toEqual([1, 10]);
+    });
+
+    it('is not invoked when the task completes on the first step without an observation', async () => {
+      const progressCalls: Array<[number, number]> = [];
+      const provider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools(): Promise<string> {
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider,
+        settleMs: 0,
+        maxSteps: 10,
+        onProgress: (step, maxSteps) => progressCalls.push([step, maxSteps]),
+      });
+      await collectEvents(loop, 'immediate complete');
+
+      expect(progressCalls).toHaveLength(0);
+    });
+
+    it('reports the correct maxSteps value', async () => {
+      const progressCalls: Array<[number, number]> = [];
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call <= 2) return '{"name":"tap","arguments":{"nodeId":"x"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({
+        provider,
+        settleMs: 0,
+        maxSteps: 7,
+        onProgress: (step, maxSteps) => progressCalls.push([step, maxSteps]),
+      });
+      await collectEvents(loop, 'maxSteps check');
+
+      expect(progressCalls.every(([, max]) => max === 7)).toBe(true);
+    });
+  });
 });

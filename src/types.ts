@@ -87,6 +87,35 @@ export interface AgentOptions {
    * long-running tasks. Default: 0 (no limit).
    */
   maxHistoryItems?: number;
+  /**
+   * Static key-value context injected into every prompt.
+   *
+   * Use this to pass user-specific or session-specific information to the LLM
+   * without embedding it in the task description or systemPromptSuffix.
+   *
+   * @example
+   * ```typescript
+   * new AgentLoop({
+   *   provider,
+   *   context: {
+   *     username: 'Matt',
+   *     language: 'Spanish',
+   *     'preferred-search': 'Google',
+   *   },
+   * })
+   * ```
+   */
+  context?: Record<string, string>;
+  /**
+   * Callback invoked after each observation step with the current and maximum
+   * step counts. Fires immediately after `onObservation`.
+   *
+   * Useful for driving a progress bar without consuming the full event stream:
+   * ```typescript
+   * onProgress: (step, maxSteps) => setProgress(step / maxSteps),
+   * ```
+   */
+  onProgress?: (step: number, maxSteps: number) => void;
 }
 
 /**

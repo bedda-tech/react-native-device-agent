@@ -61,6 +61,7 @@ export class AgentLoop {
     systemPromptSuffix: string;
     maxScreenLength: number;
     timeoutMs: number;
+    context: Record<string, string>;
   };
   private aborted = false;
   private registry: ToolRegistry;
@@ -86,6 +87,7 @@ export class AgentLoop {
       systemPromptSuffix: '',
       maxScreenLength: 6000,
       timeoutMs: 0,
+      context: {},
       ...options,
     };
     this.registry = new ToolRegistry();
@@ -199,6 +201,7 @@ export class AgentLoop {
         history.push(obsEvent);
         yield obsEvent;
         this.options.onObservation?.({ screenState, step: this._step });
+        this.options.onProgress?.(this._step, this.options.maxSteps);
         continue;
       }
 
@@ -274,6 +277,7 @@ export class AgentLoop {
       history.push(obsEvent);
       yield obsEvent;
       this.options.onObservation?.({ screenState, step: this._step });
+      this.options.onProgress?.(this._step, this.options.maxSteps);
     }
 
     if (!this.aborted) {
@@ -341,9 +345,14 @@ export class AgentLoop {
   private buildPrompt(task: string, screenState: string, history: AgentEvent[]): string {
     const historyText = this.formatHistory(history, this.options.maxHistoryItems);
     const suffix = (this.options.systemPromptSuffix ?? '').trim();
+    const ctx = this.options.context;
+    const contextLines = ctx && Object.keys(ctx).length > 0
+      ? Object.entries(ctx).map(([k, v]) => `${k}: ${v}`).join('\n')
+      : '';
 
     return [
       `Task: ${task}`,
+      contextLines ? `\nContext:\n${contextLines}` : '',
       '',
       'Current screen:',
       screenState,
