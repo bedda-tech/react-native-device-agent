@@ -486,6 +486,8 @@ export class AgentLoop {
           ? String(args.contentDescription)
           : undefined,
         className: args.className !== undefined ? String(args.className) : undefined,
+        isChecked: args.isChecked !== undefined ? Boolean(args.isChecked) : undefined,
+        isEnabled: args.isEnabled !== undefined ? Boolean(args.isEnabled) : undefined,
       });
     });
 
@@ -498,6 +500,8 @@ export class AgentLoop {
           ? String(args.contentDescription)
           : undefined,
         className: args.className !== undefined ? String(args.className) : undefined,
+        isChecked: args.isChecked !== undefined ? Boolean(args.isChecked) : undefined,
+        isEnabled: args.isEnabled !== undefined ? Boolean(args.isEnabled) : undefined,
       });
     });
 
@@ -521,12 +525,14 @@ export class AgentLoop {
       const ctrl = getController();
       const timeoutMs = args.timeoutMs !== undefined ? Number(args.timeoutMs) : 5000;
       const intervalMs = args.intervalMs !== undefined ? Number(args.intervalMs) : 500;
-      const query = {
+      const query: NodeQuery = {
         text: args.text !== undefined ? String(args.text) : undefined,
         contentDescription: args.contentDescription !== undefined
           ? String(args.contentDescription)
           : undefined,
         className: args.className !== undefined ? String(args.className) : undefined,
+        isChecked: args.isChecked !== undefined ? Boolean(args.isChecked) : undefined,
+        isEnabled: args.isEnabled !== undefined ? Boolean(args.isEnabled) : undefined,
       };
       const deadline = Date.now() + timeoutMs;
       while (Date.now() < deadline) {
@@ -576,29 +582,52 @@ function formatToolResult(result: unknown): string {
  * Supports both array-of-roots and single-root tree shapes.
  * Returns the nodeId of the matching node, or null if not found.
  */
-function findNodeInTree(
-  tree: unknown,
-  query: { text?: string; contentDescription?: string; className?: string },
-): string | null {
+type NodeQuery = {
+  text?: string;
+  contentDescription?: string;
+  className?: string;
+  isChecked?: boolean;
+  isEnabled?: boolean;
+};
+
+function findNodeInTree(tree: unknown, query: NodeQuery): string | null {
   const roots = Array.isArray(tree) ? tree : [tree];
   return searchNodes(roots as Record<string, unknown>[], query);
 }
 
-function searchNodes(
-  nodes: Record<string, unknown>[],
-  query: { text?: string; contentDescription?: string; className?: string },
-): string | null {
-  for (const node of nodes) {
+function nodeQueryMatches(node: Record<string, unknown>, query: NodeQuery): boolean {
+  const hasStringCriteria =
+    query.text !== undefined ||
+    query.contentDescription !== undefined ||
+    query.className !== undefined;
+  const hasBoolCriteria =
+    query.isChecked !== undefined || query.isEnabled !== undefined;
+
+  if (!hasStringCriteria && !hasBoolCriteria) return false;
+
+  if (hasStringCriteria) {
     const nodeText = typeof node.text === 'string' ? node.text : null;
     const nodeDesc = typeof node.contentDescription === 'string' ? node.contentDescription : null;
     const nodeCls = typeof node.className === 'string' ? node.className : null;
-
-    const matches =
+    const stringMatches =
       (query.text !== undefined && nodeText !== null && nodeText.includes(query.text)) ||
       (query.contentDescription !== undefined && nodeDesc !== null && nodeDesc.includes(query.contentDescription)) ||
       (query.className !== undefined && nodeCls === query.className);
+    if (!stringMatches) return false;
+  }
 
-    if (matches) {
+  if (query.isChecked !== undefined && Boolean(node.isChecked) !== query.isChecked) return false;
+  if (query.isEnabled !== undefined && Boolean(node.isEnabled) !== query.isEnabled) return false;
+
+  return true;
+}
+
+function searchNodes(
+  nodes: Record<string, unknown>[],
+  query: NodeQuery,
+): string | null {
+  for (const node of nodes) {
+    if (nodeQueryMatches(node, query)) {
       return typeof node.nodeId === 'string' ? node.nodeId : null;
     }
 
@@ -615,10 +644,7 @@ function searchNodes(
  * Collect all nodeIds in the accessibility tree that match the query.
  * Returns an array (possibly empty) of matching nodeIds.
  */
-function collectAllNodes(
-  tree: unknown,
-  query: { text?: string; contentDescription?: string; className?: string },
-): string[] {
+function collectAllNodes(tree: unknown, query: NodeQuery): string[] {
   const roots = Array.isArray(tree) ? tree : [tree];
   const results: string[] = [];
   gatherNodes(roots as Record<string, unknown>[], query, results);
@@ -627,20 +653,11 @@ function collectAllNodes(
 
 function gatherNodes(
   nodes: Record<string, unknown>[],
-  query: { text?: string; contentDescription?: string; className?: string },
+  query: NodeQuery,
   results: string[],
 ): void {
   for (const node of nodes) {
-    const nodeText = typeof node.text === 'string' ? node.text : null;
-    const nodeDesc = typeof node.contentDescription === 'string' ? node.contentDescription : null;
-    const nodeCls = typeof node.className === 'string' ? node.className : null;
-
-    const matches =
-      (query.text !== undefined && nodeText !== null && nodeText.includes(query.text)) ||
-      (query.contentDescription !== undefined && nodeDesc !== null && nodeDesc.includes(query.contentDescription)) ||
-      (query.className !== undefined && nodeCls === query.className);
-
-    if (matches && typeof node.nodeId === 'string') {
+    if (nodeQueryMatches(node, query) && typeof node.nodeId === 'string') {
       results.push(node.nodeId);
     }
 
