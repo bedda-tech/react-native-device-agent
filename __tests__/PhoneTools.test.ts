@@ -179,31 +179,37 @@ describe('list_apps tool', () => {
 });
 
 describe('find_node tool', () => {
-  test('has text, contentDescription, and className — all optional', () => {
+  test('has text, contentDescription, className, isChecked, isEnabled — all optional', () => {
     const tool = getTool('find_node');
     expect(tool.parameters.properties.text?.type).toBe('string');
     expect(tool.parameters.properties.contentDescription?.type).toBe('string');
     expect(tool.parameters.properties.className?.type).toBe('string');
+    expect(tool.parameters.properties.isChecked?.type).toBe('boolean');
+    expect(tool.parameters.properties.isEnabled?.type).toBe('boolean');
     expect(tool.parameters.required).toBeUndefined();
   });
 });
 
 describe('find_all_nodes tool', () => {
-  test('has text, contentDescription, and className — all optional', () => {
+  test('has text, contentDescription, className, isChecked, isEnabled — all optional', () => {
     const tool = getTool('find_all_nodes');
     expect(tool.parameters.properties.text?.type).toBe('string');
     expect(tool.parameters.properties.contentDescription?.type).toBe('string');
     expect(tool.parameters.properties.className?.type).toBe('string');
+    expect(tool.parameters.properties.isChecked?.type).toBe('boolean');
+    expect(tool.parameters.properties.isEnabled?.type).toBe('boolean');
     expect(tool.parameters.required).toBeUndefined();
   });
 });
 
 describe('wait_for_node tool', () => {
-  test('has text, contentDescription, className, timeoutMs, intervalMs — all optional', () => {
+  test('has text, contentDescription, className, isChecked, isEnabled, timeoutMs, intervalMs — all optional', () => {
     const tool = getTool('wait_for_node');
     expect(tool.parameters.properties.text?.type).toBe('string');
     expect(tool.parameters.properties.contentDescription?.type).toBe('string');
     expect(tool.parameters.properties.className?.type).toBe('string');
+    expect(tool.parameters.properties.isChecked?.type).toBe('boolean');
+    expect(tool.parameters.properties.isEnabled?.type).toBe('boolean');
     expect(tool.parameters.properties.timeoutMs?.type).toBe('number');
     expect(tool.parameters.properties.intervalMs?.type).toBe('number');
     expect(tool.parameters.required).toBeUndefined();

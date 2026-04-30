@@ -938,6 +938,58 @@ describe('AgentLoop', () => {
       expect(action).toBeDefined();
       expect(action!.result).toBeNull();
     });
+
+    it('filters by isChecked=true and returns only checked node', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue([
+        { nodeId: 'chk-off', text: 'Wi-Fi', contentDescription: null, className: 'CheckBox', isChecked: false, children: [] },
+        { nodeId: 'chk-on', text: 'Wi-Fi', contentDescription: null, className: 'CheckBox', isChecked: true, children: [] },
+      ]);
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"find_node","arguments":{"text":"Wi-Fi","isChecked":true}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'find checked Wi-Fi toggle');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'find_node',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBe('chk-on');
+    });
+
+    it('filters by isEnabled=false and returns disabled node', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue([
+        { nodeId: 'btn-enabled', text: 'Submit', contentDescription: null, className: 'Button', isEnabled: true, children: [] },
+        { nodeId: 'btn-disabled', text: 'Submit', contentDescription: null, className: 'Button', isEnabled: false, children: [] },
+      ]);
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"find_node","arguments":{"text":"Submit","isEnabled":false}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'find disabled submit button');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'find_node',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBe('btn-disabled');
+    });
   });
 
   describe('find_all_nodes tool', () => {
@@ -1025,6 +1077,33 @@ describe('AgentLoop', () => {
       ) as Extract<AgentEvent, { type: 'action' }> | undefined;
       expect(action).toBeDefined();
       expect(action!.result).toEqual(['child1', 'child2']);
+    });
+
+    it('collects only unchecked checkboxes using isChecked=false', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue([
+        { nodeId: 'opt1', text: 'Option A', contentDescription: null, className: 'CheckBox', isChecked: false, children: [] },
+        { nodeId: 'opt2', text: 'Option B', contentDescription: null, className: 'CheckBox', isChecked: true, children: [] },
+        { nodeId: 'opt3', text: 'Option C', contentDescription: null, className: 'CheckBox', isChecked: false, children: [] },
+      ]);
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"find_all_nodes","arguments":{"className":"CheckBox","isChecked":false}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'find all unchecked options');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'find_all_nodes',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toEqual(['opt1', 'opt3']);
     });
   });
 
