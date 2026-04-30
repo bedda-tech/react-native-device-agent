@@ -1308,6 +1308,105 @@ describe('AgentLoop', () => {
     });
   });
 
+  describe('set_checked tool', () => {
+    const treeWithCheckbox = (isChecked: boolean) => [
+      {
+        nodeId: 'root',
+        text: null,
+        contentDescription: null,
+        className: 'FrameLayout',
+        isChecked: false,
+        children: [
+          {
+            nodeId: 'toggle-1',
+            text: 'Wi-Fi',
+            contentDescription: null,
+            className: 'android.widget.Switch',
+            isChecked,
+            children: [],
+          },
+        ],
+      },
+    ];
+
+    beforeEach(() => {
+      mockController.tapNode.mockClear();
+    });
+
+    it('taps the node when current state differs from desired', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue(treeWithCheckbox(false));
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"set_checked","arguments":{"nodeId":"toggle-1","checked":true}}';
+          return '{"name":"task_complete","arguments":{"summary":"enabled"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'enable Wi-Fi toggle');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'set_checked',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(mockController.tapNode).toHaveBeenCalledWith('toggle-1');
+    });
+
+    it('does not tap when node is already in the desired state', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue(treeWithCheckbox(true));
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"set_checked","arguments":{"nodeId":"toggle-1","checked":true}}';
+          return '{"name":"task_complete","arguments":{"summary":"already on"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'enable Wi-Fi toggle (already on)');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'set_checked',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBe(true);
+      expect(mockController.tapNode).not.toHaveBeenCalled();
+    });
+
+    it('returns false when nodeId is not found in tree', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue([
+        { nodeId: 'root', text: null, contentDescription: null, className: 'FrameLayout', isChecked: false, children: [] },
+      ]);
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"set_checked","arguments":{"nodeId":"nonexistent","checked":true}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'toggle missing node');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'set_checked',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBe(false);
+      expect(mockController.tapNode).not.toHaveBeenCalled();
+    });
+  });
+
   describe('type_text tool', () => {
     it('calls setNodeText with the provided nodeId when given', async () => {
       let call = 0;

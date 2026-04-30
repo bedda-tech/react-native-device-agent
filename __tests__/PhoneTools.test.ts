@@ -56,6 +56,7 @@ describe('PHONE_TOOLS', () => {
       'find_all_nodes',
       'wait_for_node',
       'get_node_text',
+      'set_checked',
       'list_apps',
       'task_complete',
       'task_failed',
@@ -245,6 +246,16 @@ describe('press_enter tool', () => {
     const tool = getTool('press_enter');
     expect(tool.parameters.properties.nodeId?.type).toBe('string');
     expect(tool.parameters.required ?? []).toHaveLength(0);
+  });
+});
+
+describe('set_checked tool', () => {
+  test('requires nodeId and checked', () => {
+    const tool = getTool('set_checked');
+    expect(tool.parameters.properties.nodeId?.type).toBe('string');
+    expect(tool.parameters.properties.checked?.type).toBe('boolean');
+    expect(tool.parameters.required).toContain('nodeId');
+    expect(tool.parameters.required).toContain('checked');
   });
 });
 

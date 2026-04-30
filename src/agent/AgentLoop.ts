@@ -552,6 +552,17 @@ export class AgentLoop {
       return getNodeTextById(tree, String(args.nodeId));
     });
 
+    this.registry.register(phoneTool('set_checked'), async (args) => {
+      const ctrl = getController();
+      const nodeId = String(args.nodeId);
+      const desired = Boolean(args.checked);
+      const tree = await ctrl.getAccessibilityTree();
+      const current = getNodeCheckedById(tree, nodeId);
+      if (current === null) return false;
+      if (current === desired) return true;
+      return ctrl.tapNode(nodeId);
+    });
+
     // task_complete and task_failed are handled specially in the loop, but
     // register no-ops so registry.has() returns true for both.
     this.registry.register(phoneTool('task_complete'), async () => true);
@@ -695,6 +706,29 @@ function findNodeById(
       ? (node.children as Record<string, unknown>[])
       : [];
     const found = findNodeById(children, nodeId);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
+/**
+ * Find a specific node by its nodeId and return its isChecked state.
+ * Returns null if the node is not found.
+ */
+function getNodeCheckedById(tree: unknown, nodeId: string): boolean | null {
+  const roots = Array.isArray(tree) ? tree : [tree];
+  return findNodeChecked(roots as Record<string, unknown>[], nodeId);
+}
+
+function findNodeChecked(nodes: Record<string, unknown>[], nodeId: string): boolean | null {
+  for (const node of nodes) {
+    if (node.nodeId === nodeId) {
+      return typeof node.isChecked === 'boolean' ? node.isChecked : false;
+    }
+    const children = Array.isArray(node.children)
+      ? (node.children as Record<string, unknown>[])
+      : [];
+    const found = findNodeChecked(children, nodeId);
     if (found !== null) return found;
   }
   return null;

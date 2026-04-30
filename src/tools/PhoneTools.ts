@@ -228,6 +228,19 @@ export const PHONE_TOOLS: Tool[] = [
     },
   },
   {
+    name: 'set_checked',
+    description:
+      'Set a checkbox, toggle switch, or radio button to a specific checked state. Safe to call multiple times — reads the current state and only taps if a change is needed. Use instead of tap when you need a guaranteed final state.',
+    parameters: {
+      type: 'object',
+      properties: {
+        nodeId: { type: 'string', description: 'Accessibility node ID of the checkbox, switch, or toggle' },
+        checked: { type: 'boolean', description: 'Desired state: true to check/enable, false to uncheck/disable' },
+      },
+      required: ['nodeId', 'checked'],
+    },
+  },
+  {
     name: 'task_complete',
     description: 'Signal that the task has been completed successfully',
     parameters: {
@@ -286,6 +299,7 @@ export const PHONE_TOOL_PRESETS = {
     'wait',
     'wait_for_node',
     'get_node_text',
+    'set_checked',
     'read_screen',
   ] as string[],
 
@@ -323,6 +337,7 @@ export const PHONE_TOOL_PRESETS = {
     'wait',
     'wait_for_node',
     'get_node_text',
+    'set_checked',
     'read_screen',
     'screenshot',
   ] as string[],
