@@ -100,6 +100,40 @@ export class AgentLoop {
   }
 
   /**
+   * Register a custom tool and its execution handler.
+   *
+   * The tool will be included in every subsequent `generateWithTools` call so
+   * the LLM knows it is available. Call this before `run()` — tools registered
+   * after a run has started won't be seen by the current iteration.
+   *
+   * Use `ToolBuilder` for a fluent way to define the tool schema:
+   *
+   * ```typescript
+   * const loop = new AgentLoop({ provider });
+   *
+   * loop.registerTool(
+   *   new ToolBuilder('copy_text')
+   *     .describe('Copy text from one field and paste it into another')
+   *     .string('sourceNodeId', 'Source node ID', { required: true })
+   *     .string('targetNodeId', 'Target node ID', { required: true })
+   *     .build(),
+   *   async ({ sourceNodeId, targetNodeId }) => {
+   *     // your implementation
+   *   },
+   * );
+   * ```
+   */
+  registerTool(
+    tool: import('../types').Tool,
+    handler: (args: Record<string, unknown>) => Promise<unknown>,
+  ): void {
+    this.registry.register(tool, handler);
+    if (!this.tools.find((t) => t.name === tool.name)) {
+      this.tools.push(tool);
+    }
+  }
+
+  /**
    * Run the agent loop for a given task. Yields events for each step.
    *
    * @param task - Natural language description of what the user wants done

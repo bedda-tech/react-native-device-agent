@@ -1885,4 +1885,120 @@ describe('AgentLoop', () => {
       expect(secondPrompt).not.toContain('earlier actions omitted');
     });
   });
+
+  describe('registerTool', () => {
+    it('custom tool is passed to the provider in the tools list', async () => {
+      const capturedTools: string[] = [];
+      const provider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools(_prompt, tools) {
+          capturedTools.push(...tools.map((t) => t.name));
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, settleMs: 0 });
+      loop.registerTool(
+        {
+          name: 'copy_text',
+          description: 'Copy text between fields',
+          parameters: { type: 'object', properties: {
+            sourceNodeId: { type: 'string' },
+            targetNodeId: { type: 'string' },
+          }, required: ['sourceNodeId', 'targetNodeId'] },
+        },
+        async () => true,
+      );
+
+      await collectEvents(loop, 'custom tool task');
+
+      expect([...new Set(capturedTools)]).toContain('copy_text');
+    });
+
+    it('custom tool handler is invoked when the LLM calls it', async () => {
+      const handlerCalled: Record<string, unknown>[] = [];
+      // Second provider call (after observing screen) returns task_complete
+      let calls = 0;
+      const tieredProvider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools() {
+          calls++;
+          if (calls === 1) return '{"name":"my_tool","arguments":{"value":"hello"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider: tieredProvider, settleMs: 0 });
+      loop.registerTool(
+        {
+          name: 'my_tool',
+          description: 'A custom tool',
+          parameters: { type: 'object', properties: { value: { type: 'string' } } },
+        },
+        async (args) => {
+          handlerCalled.push(args);
+          return 'result';
+        },
+      );
+
+      await collectEvents(loop, 'invoke custom tool');
+
+      expect(handlerCalled).toHaveLength(1);
+      expect(handlerCalled[0]).toEqual({ value: 'hello' });
+    });
+
+    it('registering the same tool name twice replaces the handler', async () => {
+      const first: number[] = [];
+      const second: number[] = [];
+      let calls = 0;
+      const tieredProvider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools() {
+          calls++;
+          if (calls === 1) return '{"name":"my_tool","arguments":{}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const myTool = {
+        name: 'my_tool',
+        description: 'tool',
+        parameters: { type: 'object' as const, properties: {} },
+      };
+
+      const loop = new AgentLoop({ provider: tieredProvider, settleMs: 0 });
+      loop.registerTool(myTool, async () => { first.push(1); return true; });
+      loop.registerTool(myTool, async () => { second.push(1); return true; });
+
+      await collectEvents(loop, 'double-register task');
+
+      // Second handler should run; tool should appear only once in tools list
+      expect(second).toHaveLength(1);
+      expect(first).toHaveLength(0);
+    });
+
+    it('does not add duplicate entry to tools array on repeated registration', async () => {
+      const capturedLengths: number[] = [];
+      const provider: LLMProviderInterface = {
+        async generate() { return ''; },
+        async generateWithTools(_prompt, tools) {
+          capturedLengths.push(tools.filter((t) => t.name === 'dup_tool').length);
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, settleMs: 0 });
+      const myTool = {
+        name: 'dup_tool',
+        description: 'dup',
+        parameters: { type: 'object' as const, properties: {} },
+      };
+      loop.registerTool(myTool, async () => true);
+      loop.registerTool(myTool, async () => false);
+
+      await collectEvents(loop, 'dup register task');
+
+      expect(capturedLengths[0]).toBe(1);
+    });
+  });
 });
