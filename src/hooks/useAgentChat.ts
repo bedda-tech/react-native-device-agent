@@ -24,6 +24,16 @@ export interface UseAgentChatState {
    */
   messages: ChatMessage[];
   /**
+   * Current step count (increments after each screen observation).
+   * Resets to 0 when a new task starts. Use with `maxSteps` to drive a progress bar.
+   */
+  step: number;
+  /**
+   * Maximum number of steps the agent will take (from `options.maxSteps`, default 20).
+   * Combine with `step` to compute progress: `step / maxSteps`.
+   */
+  maxSteps: number;
+  /**
    * Submit a new user command to the agent.
    *
    * Returns a promise that resolves when the agent finishes the task.
@@ -65,6 +75,7 @@ export interface UseAgentChatState {
 export function useAgentChat(options: AgentOptions): UseAgentChatState {
   const [isRunning, setIsRunning] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [step, setStep] = useState(0);
   const loopRef = useRef<AgentLoop | null>(null);
 
   const optionsRef = useRef(options);
@@ -97,6 +108,7 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
 
     isRunningRef.current = true;
     setIsRunning(true);
+    setStep(0);
 
     const loop = new AgentLoop(optionsRef.current);
     loopRef.current = loop;
@@ -123,6 +135,7 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
 
           case 'observation':
             resolveLastAction();
+            setStep(event.step);
             appendMessage({
               id: nextId(),
               role: 'agent',
@@ -214,7 +227,7 @@ export function useAgentChat(options: AgentOptions): UseAgentChatState {
     setMessages([]);
   }, []);
 
-  return { isRunning, messages, sendMessage, stop, clearMessages };
+  return { isRunning, messages, step, maxSteps: options.maxSteps ?? 20, sendMessage, stop, clearMessages };
 }
 
 // ---------------------------------------------------------------------------

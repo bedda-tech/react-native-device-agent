@@ -595,6 +595,12 @@ export class AgentLoop {
       return getNodeTextById(tree, String(args.nodeId));
     });
 
+    this.registry.register(phoneTool('get_bounds'), async (args) => {
+      const ctrl = getController();
+      const tree = await ctrl.getAccessibilityTree();
+      return getBoundsById(tree, String(args.nodeId));
+    });
+
     this.registry.register(phoneTool('set_checked'), async (args) => {
       const ctrl = getController();
       const nodeId = String(args.nodeId);
@@ -819,6 +825,40 @@ function searchScrollable(nodes: Record<string, unknown>[]): string | null {
       : [];
     const found = searchScrollable(children);
     if (found) return found;
+  }
+  return null;
+}
+
+/**
+ * Find a specific node by its nodeId and return its bounds.
+ * Returns null if the node is not found or has no bounds.
+ */
+function getBoundsById(
+  tree: unknown,
+  nodeId: string,
+): { left: number; top: number; right: number; bottom: number } | null {
+  const roots = Array.isArray(tree) ? tree : [tree];
+  return findNodeBounds(roots as Record<string, unknown>[], nodeId);
+}
+
+function findNodeBounds(
+  nodes: Record<string, unknown>[],
+  nodeId: string,
+): { left: number; top: number; right: number; bottom: number } | null {
+  for (const node of nodes) {
+    if (node.nodeId === nodeId) {
+      const b = node.bounds as Record<string, unknown> | undefined;
+      if (b && typeof b.left === 'number' && typeof b.top === 'number' &&
+          typeof b.right === 'number' && typeof b.bottom === 'number') {
+        return { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
+      }
+      return null;
+    }
+    const children = Array.isArray(node.children)
+      ? (node.children as Record<string, unknown>[])
+      : [];
+    const found = findNodeBounds(children, nodeId);
+    if (found !== null) return found;
   }
   return null;
 }
