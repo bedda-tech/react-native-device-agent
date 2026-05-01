@@ -216,6 +216,18 @@ export const PHONE_TOOLS: Tool[] = [
     },
   },
   {
+    name: 'wait_for_change',
+    description:
+      'Wait until the screen content changes from its current state. Snapshots the current screen text, then polls until the content differs. Returns true when a change is detected, false if the timeout expires with no change. Use after performing an action (tap, swipe, open_app) to detect navigation or async UI updates without relying on a specific element name.',
+    parameters: {
+      type: 'object',
+      properties: {
+        timeoutMs: { type: 'number', description: 'Maximum wait time in milliseconds (default 5000)' },
+        pollIntervalMs: { type: 'number', description: 'How often to check for changes in milliseconds (default 500)' },
+      },
+    },
+  },
+  {
     name: 'get_node_text',
     description:
       'Get the text content and content description of a specific node by its ID. More efficient than read_screen when you only need the value of one element (e.g. to verify a field value or read a label).',
@@ -335,6 +347,7 @@ export const PHONE_TOOL_PRESETS = {
     'find_all_nodes',
     'wait',
     'wait_for_node',
+    'wait_for_change',
     'get_node_text',
     'get_bounds',
     'set_checked',
@@ -355,6 +368,7 @@ export const PHONE_TOOL_PRESETS = {
     'find_node',
     'find_all_nodes',
     'wait_for_node',
+    'wait_for_change',
     'get_node_text',
     'scroll',
     'read_screen',
@@ -378,6 +392,7 @@ export const PHONE_TOOL_PRESETS = {
     'find_all_nodes',
     'wait',
     'wait_for_node',
+    'wait_for_change',
     'get_node_text',
     'get_bounds',
     'set_checked',

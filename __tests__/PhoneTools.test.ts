@@ -55,6 +55,7 @@ describe('PHONE_TOOLS', () => {
       'find_node',
       'find_all_nodes',
       'wait_for_node',
+      'wait_for_change',
       'get_node_text',
       'get_bounds',
       'set_checked',
@@ -220,6 +221,15 @@ describe('wait_for_node tool', () => {
   });
 });
 
+describe('wait_for_change tool', () => {
+  test('has timeoutMs and pollIntervalMs — both optional', () => {
+    const tool = getTool('wait_for_change');
+    expect(tool.parameters.properties.timeoutMs?.type).toBe('number');
+    expect(tool.parameters.properties.pollIntervalMs?.type).toBe('number');
+    expect(tool.parameters.required).toBeUndefined();
+  });
+});
+
 describe('get_node_text tool', () => {
   test('requires nodeId', () => {
     const tool = getTool('get_node_text');
@@ -331,6 +341,13 @@ describe('PHONE_TOOL_PRESETS', () => {
     const preset = PHONE_TOOL_PRESETS.IN_APP;
     expect(preset).not.toContain('open_app');
     expect(preset).not.toContain('global_action');
+  });
+
+  test('wait_for_change is in NAVIGATION, TEXT_INPUT, IN_APP but not READ_ONLY', () => {
+    expect(PHONE_TOOL_PRESETS.NAVIGATION).toContain('wait_for_change');
+    expect(PHONE_TOOL_PRESETS.TEXT_INPUT).toContain('wait_for_change');
+    expect(PHONE_TOOL_PRESETS.IN_APP).toContain('wait_for_change');
+    expect(PHONE_TOOL_PRESETS.READ_ONLY).not.toContain('wait_for_change');
   });
 
   test('write_note and read_note are available in all named presets', () => {

@@ -591,6 +591,22 @@ export class AgentLoop {
       return null;
     });
 
+    this.registry.register(phoneTool('wait_for_change'), async (args) => {
+      const ctrl = getController();
+      const timeoutMs = args.timeoutMs !== undefined ? Number(args.timeoutMs) : 5000;
+      const intervalMs = args.pollIntervalMs !== undefined ? Number(args.pollIntervalMs) : 500;
+      const baseline = await ctrl.getScreenText();
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) break;
+        await this.delay(Math.min(intervalMs, remaining));
+        const current = await ctrl.getScreenText();
+        if (current !== baseline) return true;
+      }
+      return false;
+    });
+
     this.registry.register(phoneTool('get_node_text'), async (args) => {
       const ctrl = getController();
       const tree = await ctrl.getAccessibilityTree();

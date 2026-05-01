@@ -23,6 +23,7 @@ const mockController = {
   getInstalledApps: jest.fn().mockResolvedValue([]),
   globalAction: jest.fn().mockResolvedValue(true),
   takeScreenshot: jest.fn().mockResolvedValue('/tmp/screen.png'),
+  getScreenText: jest.fn().mockResolvedValue('default screen text'),
 };
 
 jest.mock('react-native-accessibility-controller', () => mockController, {
@@ -1205,6 +1206,87 @@ describe('AgentLoop', () => {
       expect(action).toBeDefined();
       expect(action!.result).toBe('dynamic-node');
       expect(treeCalls).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  describe('wait_for_change tool', () => {
+    it('returns true when screen text changes before timeout', async () => {
+      let textCall = 0;
+      mockController.getScreenText.mockImplementation(async () => {
+        textCall++;
+        return textCall === 1 ? 'before screen' : 'after screen';
+      });
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"wait_for_change","arguments":{"timeoutMs":10000,"pollIntervalMs":0}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'wait for screen change');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'wait_for_change',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBe(true);
+    });
+
+    it('returns false when screen does not change within timeout', async () => {
+      mockController.getScreenText.mockResolvedValue('static screen');
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"wait_for_change","arguments":{"timeoutMs":0}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'wait for change that never comes');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'wait_for_change',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBe(false);
+    });
+
+    it('polls multiple times until screen changes', async () => {
+      let textCalls = 0;
+      mockController.getScreenText.mockImplementation(async () => {
+        textCalls++;
+        return textCalls < 4 ? 'initial screen' : 'new screen';
+      });
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"wait_for_change","arguments":{"timeoutMs":10000,"pollIntervalMs":0}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'wait for delayed change');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'wait_for_change',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBe(true);
+      // baseline (call 1) + at least 3 polls before change on call 4
+      expect(textCalls).toBeGreaterThanOrEqual(4);
     });
   });
 
