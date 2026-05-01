@@ -25,6 +25,7 @@ let AccessibilityController: {
   scrollNode: (nodeId: string, direction: string) => Promise<boolean>;
   openApp: (packageName: string) => Promise<boolean>;
   getInstalledApps: () => Promise<Array<{ packageName: string; label: string }>>;
+  getScreenText: () => Promise<string>;
   globalAction: (action: string) => Promise<boolean>;
   takeScreenshot: () => Promise<string>;
 } | null = null;
