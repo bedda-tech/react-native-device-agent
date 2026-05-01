@@ -1407,6 +1407,193 @@ describe('AgentLoop', () => {
     });
   });
 
+  describe('get_bounds tool', () => {
+    const treeWithBounds = [
+      {
+        nodeId: 'root',
+        text: null,
+        contentDescription: null,
+        className: 'FrameLayout',
+        children: [
+          {
+            nodeId: 'btn-42',
+            text: 'OK',
+            contentDescription: null,
+            className: 'android.widget.Button',
+            bounds: { left: 100, top: 200, right: 300, bottom: 250 },
+            children: [],
+          },
+        ],
+      },
+    ];
+
+    it('returns bounds object for an existing node', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue(treeWithBounds);
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"get_bounds","arguments":{"nodeId":"btn-42"}}';
+          return '{"name":"task_complete","arguments":{"summary":"got bounds"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'get button bounds');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'get_bounds',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toEqual({ left: 100, top: 200, right: 300, bottom: 250 });
+    });
+
+    it('returns null when the nodeId does not exist in the tree', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue([
+        { nodeId: 'root', text: null, contentDescription: null, className: 'FrameLayout', children: [] },
+      ]);
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"get_bounds","arguments":{"nodeId":"nonexistent-99"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'get bounds of missing node');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'get_bounds',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBeNull();
+    });
+
+    it('returns null when the node has no bounds property', async () => {
+      mockController.getAccessibilityTree.mockResolvedValue([
+        {
+          nodeId: 'no-bounds',
+          text: 'Boundless',
+          contentDescription: null,
+          className: 'View',
+          children: [],
+        },
+      ]);
+
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"get_bounds","arguments":{"nodeId":"no-bounds"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'get bounds of node without bounds');
+
+      const action = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'get_bounds',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(action).toBeDefined();
+      expect(action!.result).toBeNull();
+    });
+  });
+
+  describe('write_note and read_note tools', () => {
+    it('write_note stores a value and read_note retrieves it within the same task', async () => {
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"write_note","arguments":{"key":"pkg","value":"com.example.app"}}';
+          if (call === 2) return '{"name":"read_note","arguments":{"key":"pkg"}}';
+          return '{"name":"task_complete","arguments":{"summary":"noted"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 10, settleMs: 0 });
+      const events = await collectEvents(loop, 'remember the package name');
+
+      const writeAction = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'write_note',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(writeAction).toBeDefined();
+      expect(writeAction!.result).toBe(true);
+
+      const readAction = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'read_note',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(readAction).toBeDefined();
+      expect(readAction!.result).toBe('com.example.app');
+    });
+
+    it('read_note returns null for a key that was never written', async () => {
+      let call = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          call++;
+          if (call === 1) return '{"name":"read_note","arguments":{"key":"nonexistent"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider, maxSteps: 5, settleMs: 0 });
+      const events = await collectEvents(loop, 'read missing note');
+
+      const readAction = events.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'read_note',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(readAction).toBeDefined();
+      expect(readAction!.result).toBeNull();
+    });
+
+    it('notes are cleared between run() calls', async () => {
+      let writeCall = 0;
+      const writeProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          writeCall++;
+          if (writeCall === 1) return '{"name":"write_note","arguments":{"key":"x","value":"first-run"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const loop = new AgentLoop({ provider: writeProvider, maxSteps: 5, settleMs: 0 });
+      // First run writes the note
+      await collectEvents(loop, 'task 1');
+
+      // Second run with a provider that reads the same key
+      let readCall = 0;
+      const readProvider: LLMProviderInterface = {
+        async generate(): Promise<string> { return ''; },
+        async generateWithTools(): Promise<string> {
+          readCall++;
+          if (readCall === 1) return '{"name":"read_note","arguments":{"key":"x"}}';
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+      (loop as unknown as { options: { provider: LLMProviderInterface } }).options.provider = readProvider;
+
+      const events2 = await collectEvents(loop, 'task 2');
+      const readAction = events2.find(
+        (e) => e.type === 'action' && (e as Extract<AgentEvent, { type: 'action' }>).tool === 'read_note',
+      ) as Extract<AgentEvent, { type: 'action' }> | undefined;
+      expect(readAction).toBeDefined();
+      // Note should be gone — cleared at the start of the new run
+      expect(readAction!.result).toBeNull();
+    });
+  });
+
   describe('type_text tool', () => {
     it('calls setNodeText with the provided nodeId when given', async () => {
       let call = 0;

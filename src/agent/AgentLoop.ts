@@ -66,6 +66,7 @@ export class AgentLoop {
   private aborted = false;
   private registry: ToolRegistry;
   private tools: Tool[];
+  private _notes: Map<string, string> = new Map();
 
   private _running = false;
   private _step = 0;
@@ -144,6 +145,7 @@ export class AgentLoop {
     this._running = true;
     this._task = task;
     this._step = 0;
+    this._notes.clear();
     const history: AgentEvent[] = [];
 
     try {
@@ -610,6 +612,16 @@ export class AgentLoop {
       if (current === null) return false;
       if (current === desired) return true;
       return ctrl.tapNode(nodeId);
+    });
+
+    this.registry.register(phoneTool('write_note'), async (args) => {
+      this._notes.set(String(args.key), String(args.value));
+      return true;
+    });
+
+    this.registry.register(phoneTool('read_note'), async (args) => {
+      const value = this._notes.get(String(args.key));
+      return value !== undefined ? value : null;
     });
 
     // task_complete and task_failed are handled specially in the loop, but

@@ -274,6 +274,31 @@ export const PHONE_TOOLS: Tool[] = [
       required: ['reason'],
     },
   },
+  {
+    name: 'write_note',
+    description:
+      'Store a named note in session memory. Useful for saving package names, node IDs, app states, or any value you will need to reference in a later step. Notes persist for the duration of the task but are not shared between tasks.',
+    parameters: {
+      type: 'object',
+      properties: {
+        key: { type: 'string', description: 'Note name (e.g. "target_app", "wifi_node_id")' },
+        value: { type: 'string', description: 'Value to store' },
+      },
+      required: ['key', 'value'],
+    },
+  },
+  {
+    name: 'read_note',
+    description:
+      'Retrieve a note previously stored with write_note. Returns the stored string value, or null if no note with that key exists.',
+    parameters: {
+      type: 'object',
+      properties: {
+        key: { type: 'string', description: 'Note name to look up' },
+      },
+      required: ['key'],
+    },
+  },
 ];
 
 /**
@@ -295,7 +320,7 @@ export const PHONE_TOOL_PRESETS = {
   FULL: undefined as string[] | undefined,
 
   /** Read the screen and take screenshots only. No actions are taken. */
-  READ_ONLY: ['read_screen', 'screenshot', 'list_apps'] as string[],
+  READ_ONLY: ['read_screen', 'screenshot', 'list_apps', 'write_note', 'read_note'] as string[],
 
   /** Navigate the phone: tap, swipe, scroll, open apps, use system buttons. No text input. */
   NAVIGATION: [
@@ -314,6 +339,8 @@ export const PHONE_TOOL_PRESETS = {
     'get_bounds',
     'set_checked',
     'read_screen',
+    'write_note',
+    'read_note',
   ] as string[],
 
   /**
@@ -331,6 +358,8 @@ export const PHONE_TOOL_PRESETS = {
     'get_node_text',
     'scroll',
     'read_screen',
+    'write_note',
+    'read_note',
   ] as string[],
 
   /**
@@ -354,5 +383,7 @@ export const PHONE_TOOL_PRESETS = {
     'set_checked',
     'read_screen',
     'screenshot',
+    'write_note',
+    'read_note',
   ] as string[],
 } as const;

@@ -56,10 +56,13 @@ describe('PHONE_TOOLS', () => {
       'find_all_nodes',
       'wait_for_node',
       'get_node_text',
+      'get_bounds',
       'set_checked',
       'list_apps',
       'task_complete',
       'task_failed',
+      'write_note',
+      'read_note',
     ];
     for (const name of expected) {
       expect(PHONE_TOOLS.some((t) => t.name === name)).toBe(true);
@@ -249,6 +252,14 @@ describe('press_enter tool', () => {
   });
 });
 
+describe('get_bounds tool', () => {
+  test('requires nodeId', () => {
+    const tool = getTool('get_bounds');
+    expect(tool.parameters.properties.nodeId?.type).toBe('string');
+    expect(tool.parameters.required).toContain('nodeId');
+  });
+});
+
 describe('set_checked tool', () => {
   test('requires nodeId and checked', () => {
     const tool = getTool('set_checked');
@@ -256,6 +267,24 @@ describe('set_checked tool', () => {
     expect(tool.parameters.properties.checked?.type).toBe('boolean');
     expect(tool.parameters.required).toContain('nodeId');
     expect(tool.parameters.required).toContain('checked');
+  });
+});
+
+describe('write_note tool', () => {
+  test('requires key and value', () => {
+    const tool = getTool('write_note');
+    expect(tool.parameters.properties.key?.type).toBe('string');
+    expect(tool.parameters.properties.value?.type).toBe('string');
+    expect(tool.parameters.required).toContain('key');
+    expect(tool.parameters.required).toContain('value');
+  });
+});
+
+describe('read_note tool', () => {
+  test('requires key', () => {
+    const tool = getTool('read_note');
+    expect(tool.parameters.properties.key?.type).toBe('string');
+    expect(tool.parameters.required).toContain('key');
   });
 });
 
@@ -302,6 +331,19 @@ describe('PHONE_TOOL_PRESETS', () => {
     const preset = PHONE_TOOL_PRESETS.IN_APP;
     expect(preset).not.toContain('open_app');
     expect(preset).not.toContain('global_action');
+  });
+
+  test('write_note and read_note are available in all named presets', () => {
+    const namedPresets = [
+      PHONE_TOOL_PRESETS.READ_ONLY,
+      PHONE_TOOL_PRESETS.NAVIGATION,
+      PHONE_TOOL_PRESETS.TEXT_INPUT,
+      PHONE_TOOL_PRESETS.IN_APP,
+    ];
+    for (const preset of namedPresets) {
+      expect(preset).toContain('write_note');
+      expect(preset).toContain('read_note');
+    }
   });
 
   test('all preset tool names exist in PHONE_TOOLS', () => {
