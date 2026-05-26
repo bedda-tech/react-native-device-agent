@@ -50,7 +50,7 @@ The loop terminates when the LLM calls `task_complete` or the step limit is reac
 ## Features
 
 - **Pluggable LLM providers** -- on-device (Gemma 4 via ExecuTorch) or cloud (OpenAI, Anthropic) fallback
-- **10 built-in phone tools** -- tap, type, swipe, scroll, open app, screenshot, global actions, and more
+- **24 built-in phone tools** -- tap, type, swipe, scroll, find nodes, clipboard, session notes, and more
 - **Custom tools** -- register your own tools with the ToolRegistry
 - **React hooks** -- `useAgent` for easy integration into React Native apps
 - **Streaming events** -- async generator yields every action, observation, and completion
@@ -110,18 +110,59 @@ const { execute } = useAgent({
 
 ## Built-in Tools
 
+**Touch & Input**
+
 | Tool | Description |
 |------|-------------|
 | `tap` | Tap a UI element by node ID or coordinates |
+| `long_press` | Long press a UI element by node ID or coordinates |
 | `type_text` | Type text into a focused input field |
+| `clear_text` | Clear text from an input field |
+| `press_enter` | Press the Enter key on a focused input |
 | `swipe` | Swipe between two screen coordinates |
-| `scroll` | Scroll a scrollable element |
+| `scroll` | Scroll a scrollable element up, down, left, or right |
+| `set_checked` | Toggle a checkbox or switch to a desired checked state |
+
+**Navigation & Apps**
+
+| Tool | Description |
+|------|-------------|
 | `open_app` | Open an app by package name |
-| `read_screen` | Capture current screen state as text |
+| `list_apps` | List all installed apps and their package names |
+| `global_action` | System actions (home, back, recents, notifications, etc.) |
+
+**Screen Reading**
+
+| Tool | Description |
+|------|-------------|
+| `read_screen` | Capture current screen state as structured text |
 | `screenshot` | Take a screenshot for visual analysis |
-| `global_action` | System actions (home, back, recents, notifications) |
-| `wait` | Wait for screen to update |
-| `task_complete` | Signal the task is done |
+| `find_node` | Search the tree for a node by text, description, or class |
+| `find_all_nodes` | Find all nodes matching a query |
+| `get_node_text` | Read the text or content description of a specific node |
+| `get_bounds` | Get the screen coordinates of a node |
+
+**Waiting & Timing**
+
+| Tool | Description |
+|------|-------------|
+| `wait` | Wait a specified number of milliseconds |
+| `wait_for_node` | Wait until a matching node appears in the tree |
+| `wait_for_change` | Wait until the screen state changes |
+
+**Session Memory**
+
+| Tool | Description |
+|------|-------------|
+| `write_note` | Store a key-value note for use later in the session |
+| `read_note` | Retrieve a previously stored note |
+
+**Task Control**
+
+| Tool | Description |
+|------|-------------|
+| `task_complete` | Signal the task is done with a summary |
+| `task_failed` | Signal that the task cannot be completed, with a reason |
 
 ## Custom Tools
 
