@@ -1,6 +1,6 @@
 {
   "name": "react-native-device-agent",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Agent orchestration loop for on-device AI phone control. Connects LLM reasoning to phone actions via accessibility APIs.",
   "main": "lib/commonjs/index.js",
   "module": "lib/typescript/index.js",
