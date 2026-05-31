@@ -331,6 +331,23 @@ export const PHONE_TOOL_PRESETS = {
   /** All available tools (default — same as omitting toolFilter). */
   FULL: undefined as string[] | undefined,
 
+  /**
+   * Web browsing — Chrome on Android exposes full accessibility trees (headings, links,
+   * inputs, tab bar). Keeps the tool list focused on browser controls to reduce token
+   * usage and hallucinations on web-only tasks.
+   */
+  WEB: [
+    'open_app',
+    'tap',
+    'type_text',
+    'press_enter',
+    'scroll',
+    'read_screen',
+    'find_node',
+    'wait_for_change',
+    'screenshot',
+  ] as string[],
+
   /** Read the screen and take screenshots only. No actions are taken. */
   READ_ONLY: ['read_screen', 'screenshot', 'list_apps', 'write_note', 'read_note'] as string[],
 
