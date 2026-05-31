@@ -446,6 +446,105 @@ describe('TaskPlanner', () => {
     });
   });
 
+  describe('subtask context passing', () => {
+    it('passes previous subtask result as context to the next subtask prompt', async () => {
+      const capturedPrompts: string[] = [];
+      let execCallCount = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> {
+          return '1. First step\n2. Second step';
+        },
+        async generateWithTools(prompt: string, _tools: Tool[]): Promise<string> {
+          execCallCount++;
+          capturedPrompts.push(prompt);
+          return `{"name":"task_complete","arguments":{"summary":"result of step ${execCallCount}"}}`;
+        },
+      };
+
+      const planner = new TaskPlanner({ provider, maxSteps: 5, settleMs: 0 });
+      await collectEvents(planner, 'Two step task');
+
+      // The second subtask should receive the first subtask's result in context
+      const secondPrompt = capturedPrompts[1];
+      expect(secondPrompt).toBeDefined();
+      expect(secondPrompt).toContain('result of step 1');
+      expect(secondPrompt).toContain('Step 1 result');
+    });
+
+    it('accumulates context across multiple subtasks', async () => {
+      const capturedPrompts: string[] = [];
+      let execCallCount = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> {
+          return '1. Step A\n2. Step B\n3. Step C';
+        },
+        async generateWithTools(prompt: string, _tools: Tool[]): Promise<string> {
+          execCallCount++;
+          capturedPrompts.push(prompt);
+          return `{"name":"task_complete","arguments":{"summary":"done step ${execCallCount}"}}`;
+        },
+      };
+
+      const planner = new TaskPlanner({ provider, maxSteps: 5, settleMs: 0 });
+      await collectEvents(planner, 'Three step task');
+
+      // Third subtask should see results from both prior subtasks
+      const thirdPrompt = capturedPrompts[2];
+      expect(thirdPrompt).toBeDefined();
+      expect(thirdPrompt).toContain('Step 1 result');
+      expect(thirdPrompt).toContain('Step 2 result');
+    });
+
+    it('preserves user-supplied context alongside accumulated results', async () => {
+      const capturedPrompts: string[] = [];
+      let execCallCount = 0;
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> {
+          return '1. Do something\n2. Do next thing';
+        },
+        async generateWithTools(prompt: string, _tools: Tool[]): Promise<string> {
+          execCallCount++;
+          capturedPrompts.push(prompt);
+          return `{"name":"task_complete","arguments":{"summary":"step ${execCallCount} done"}}`;
+        },
+      };
+
+      const planner = new TaskPlanner({
+        provider,
+        maxSteps: 5,
+        settleMs: 0,
+        context: { username: 'Alice' },
+      });
+      await collectEvents(planner, 'Context preservation test');
+
+      // Both subtasks should see the user context
+      expect(capturedPrompts[0]).toContain('Alice');
+      expect(capturedPrompts[1]).toContain('Alice');
+      // Second subtask should also have step 1 result
+      expect(capturedPrompts[1]).toContain('step 1 done');
+    });
+
+    it('first subtask receives no prior-result context', async () => {
+      const capturedPrompts: string[] = [];
+      const provider: LLMProviderInterface = {
+        async generate(): Promise<string> {
+          return '1. Only step';
+        },
+        async generateWithTools(prompt: string, _tools: Tool[]): Promise<string> {
+          capturedPrompts.push(prompt);
+          return '{"name":"task_complete","arguments":{"summary":"done"}}';
+        },
+      };
+
+      const planner = new TaskPlanner({ provider, maxSteps: 5, settleMs: 0 });
+      await collectEvents(planner, 'Single subtask');
+
+      const firstPrompt = capturedPrompts[0];
+      expect(firstPrompt).toBeDefined();
+      expect(firstPrompt).not.toContain('Step 1 result');
+    });
+  });
+
   describe('subtask parsing', () => {
     it('parses numbered list with dot separator (1. text)', async () => {
       const provider = makeDecomposeProvider('1. Open app\n2. Tap button');

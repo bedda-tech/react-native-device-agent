@@ -126,15 +126,21 @@ export class TaskPlanner {
 
     yield { type: 'plan', subtasks };
 
-    // Step 2: Execute each subtask sequentially
+    // Step 2: Execute each subtask sequentially, forwarding results as context
     const results: string[] = [];
+    // Accumulated results from completed subtasks, injected into each subsequent
+    // AgentLoop so the LLM knows what prior steps accomplished.
+    const priorResults: Record<string, string> = {};
 
     for (const subtask of subtasks) {
       if (this._aborted) break;
 
       yield { type: 'subtask_start', subtask };
 
-      const loop = new AgentLoop(this.options);
+      const loop = new AgentLoop({
+        ...this.options,
+        context: { ...this.options.context, ...priorResults },
+      });
       this._currentLoop = loop;
       let subtaskResult = '';
       let hadError = false;
@@ -172,6 +178,7 @@ export class TaskPlanner {
       if (!hadError && !this._aborted) {
         const result = subtaskResult || `Completed: ${subtask.description}`;
         results.push(result);
+        priorResults[`Step ${subtask.index + 1} result`] = result;
         yield { type: 'subtask_complete', subtask, result };
       }
     }
