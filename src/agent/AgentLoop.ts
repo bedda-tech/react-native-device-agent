@@ -551,6 +551,50 @@ export class AgentLoop {
       });
     });
 
+    this.registry.register(phoneTool('scroll_until_found'), async (args) => {
+      const ctrl = getController();
+      const direction = String(args.direction);
+      const maxScrolls = args.maxScrolls !== undefined ? Number(args.maxScrolls) : 20;
+      const intervalMs = args.intervalMs !== undefined ? Number(args.intervalMs) : 300;
+      const query: NodeQuery = {
+        text: args.text !== undefined ? String(args.text) : undefined,
+        contentDescription: args.contentDescription !== undefined
+          ? String(args.contentDescription)
+          : undefined,
+        className: args.className !== undefined ? String(args.className) : undefined,
+        isChecked: args.isChecked !== undefined ? Boolean(args.isChecked) : undefined,
+        isEnabled: args.isEnabled !== undefined ? Boolean(args.isEnabled) : undefined,
+      };
+      // Resolve scrollable container once; reuse across all scroll steps.
+      let scrollNodeId: string | null = args.scrollNodeId !== undefined
+        ? String(args.scrollNodeId)
+        : null;
+      if (!scrollNodeId) {
+        const initialTree = await ctrl.getAccessibilityTree();
+        const found = findNodeInTree(initialTree, query);
+        if (found !== null) return found;
+        scrollNodeId = findFirstScrollableNode(initialTree);
+        if (!scrollNodeId) {
+          throw new Error(
+            'scroll_until_found: no scrollable element found on screen. Provide a scrollNodeId or ensure the screen has a scrollable container.',
+          );
+        }
+      } else {
+        // scrollNodeId was provided — still check if item is already visible.
+        const initialTree = await ctrl.getAccessibilityTree();
+        const found = findNodeInTree(initialTree, query);
+        if (found !== null) return found;
+      }
+      for (let i = 0; i < maxScrolls; i++) {
+        await ctrl.scrollNode(scrollNodeId, direction);
+        await this.delay(intervalMs);
+        const tree = await ctrl.getAccessibilityTree();
+        const nodeId = findNodeInTree(tree, query);
+        if (nodeId !== null) return nodeId;
+      }
+      return null;
+    });
+
     this.registry.register(phoneTool('screenshot'), async () => {
       const ctrl = getController();
       return ctrl.takeScreenshot();

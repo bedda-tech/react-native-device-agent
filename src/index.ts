@@ -48,6 +48,10 @@ export { CloudProvider } from './providers/CloudProvider';
 export type { CloudProviderOptions } from './providers/CloudProvider';
 export { FallbackProvider } from './providers/FallbackProvider';
 export type { FallbackProviderOptions, ComplexityHeuristics } from './providers/FallbackProvider';
+export { FunctionGemmaProvider } from './providers/FunctionGemmaProvider';
+export type { FunctionGemmaProviderOptions } from './providers/FunctionGemmaProvider';
+export { DualModelProvider } from './providers/DualModelProvider';
+export type { DualModelProviderOptions } from './providers/DualModelProvider';
 
 // ---------------------------------------------------------------------------
 // React hooks

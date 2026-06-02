@@ -199,6 +199,33 @@ export const PHONE_TOOLS: Tool[] = [
     },
   },
   {
+    name: 'scroll_until_found',
+    description:
+      'Scroll a container repeatedly in a direction until a matching node appears in the accessibility tree, then return its nodeId. Returns null if the node is not found after maxScrolls scrolls. Use for long lists where the target item is not currently visible (e.g. finding a contact, app, or setting buried in a scrollable list).',
+    parameters: {
+      type: 'object',
+      properties: {
+        direction: {
+          type: 'string',
+          description: 'Scroll direction',
+          enum: ['up', 'down', 'left', 'right'],
+        },
+        text: { type: 'string', description: 'Substring to match against node text (case-sensitive)' },
+        contentDescription: { type: 'string', description: 'Substring to match against node content description' },
+        className: { type: 'string', description: 'Exact class name to match (e.g. android.widget.Button)' },
+        isChecked: { type: 'boolean', description: 'Filter by checked state (true=checked, false=unchecked)' },
+        isEnabled: { type: 'boolean', description: 'Filter by enabled state (false to find disabled nodes)' },
+        scrollNodeId: {
+          type: 'string',
+          description: 'Node ID of the scrollable container (optional, auto-detects if omitted)',
+        },
+        maxScrolls: { type: 'number', description: 'Maximum number of scroll steps before giving up (default 20)' },
+        intervalMs: { type: 'number', description: 'Delay in ms between scroll and accessibility-tree check (default 300)' },
+      },
+      required: ['direction'],
+    },
+  },
+  {
     name: 'wait_for_node',
     description:
       'Poll the accessibility tree until a node matching the query appears, then return its nodeId. Returns null if the timeout expires before the node is found. Use after actions that trigger async UI changes (e.g. navigation, loading screens).',
@@ -357,6 +384,7 @@ export const PHONE_TOOL_PRESETS = {
     'long_press',
     'swipe',
     'scroll',
+    'scroll_until_found',
     'global_action',
     'open_app',
     'list_apps',
@@ -405,6 +433,7 @@ export const PHONE_TOOL_PRESETS = {
     'press_enter',
     'swipe',
     'scroll',
+    'scroll_until_found',
     'find_node',
     'find_all_nodes',
     'wait',
