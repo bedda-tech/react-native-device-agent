@@ -31,6 +31,20 @@ export interface DualModelProviderOptions {
    */
   loadDispatchProvider?: () => Promise<LLMProviderInterface>;
   /**
+   * Restrict which tools are offered to the dispatch provider.
+   *
+   * FunctionGemma 270M performs best with a compact tool list to stay within
+   * the prefill token budget. Pass `PHONE_TOOL_PRESETS.DISPATCH` to limit the
+   * schema to direct-action tools only (tap, swipe, type, etc.).
+   *
+   * When set, `generateWithTools` filters the `tools` array before forwarding
+   * to the dispatch provider. The unfiltered `tools` list is still passed to
+   * the reasoning provider on fallback.
+   *
+   * Default: undefined (pass all tools to dispatch provider).
+   */
+  dispatchToolFilter?: string[];
+  /**
    * Log routing decisions to the console using a [DualModelProvider] prefix.
    * Useful for profiling which model handles each step. Default: false.
    */
@@ -75,6 +89,7 @@ export class DualModelProvider extends LLMProvider {
   private readonly reasoning: LLMProviderInterface;
   private readonly _staticDispatch: LLMProviderInterface | undefined;
   private readonly _loadDispatch: (() => Promise<LLMProviderInterface>) | undefined;
+  private readonly _dispatchToolFilter: Set<string> | undefined;
   private readonly _debug: boolean;
 
   private _dispatch: LLMProviderInterface | null = null;
@@ -85,6 +100,9 @@ export class DualModelProvider extends LLMProvider {
     this.reasoning = options.reasoningProvider;
     this._staticDispatch = options.dispatchProvider;
     this._loadDispatch = options.loadDispatchProvider;
+    this._dispatchToolFilter = options.dispatchToolFilter
+      ? new Set(options.dispatchToolFilter)
+      : undefined;
     this._debug = options.debug ?? false;
 
     if (this._staticDispatch) {
@@ -111,8 +129,11 @@ export class DualModelProvider extends LLMProvider {
     try {
       const dispatch = await this.resolveDispatch();
       if (dispatch) {
-        this.log('generateWithTools → dispatchProvider');
-        return await dispatch.generateWithTools(prompt, tools);
+        const dispatchTools = this._dispatchToolFilter
+          ? tools.filter((t) => this._dispatchToolFilter!.has(t.name))
+          : tools;
+        this.log(`generateWithTools → dispatchProvider (${dispatchTools.length} tools)`);
+        return await dispatch.generateWithTools(prompt, dispatchTools);
       }
     } catch (err) {
       this.log(

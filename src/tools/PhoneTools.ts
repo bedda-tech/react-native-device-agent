@@ -422,6 +422,37 @@ export const PHONE_TOOL_PRESETS = {
   ] as string[],
 
   /**
+   * Fast tool dispatch for FunctionGemma 270M.
+   *
+   * Contains only the 12 direct-action tools — no search, read, or find tools.
+   * Keeps the schema under ~800 tokens so FunctionGemma can prefill within
+   * its ≤500ms target at 1,916 tok/s on a Pixel 8.
+   *
+   * Use this as the toolFilter when constructing a FunctionGemmaProvider:
+   *   new AgentLoop({
+   *     provider: new DualModelProvider({ ... }),
+   *     toolFilter: PHONE_TOOL_PRESETS.DISPATCH,
+   *   })
+   * Or pass it to FunctionGemmaProvider's generateWithTools by filtering the
+   * tools argument before calling the dispatch model.
+   */
+  DISPATCH: [
+    'tap',
+    'long_press',
+    'swipe',
+    'scroll',
+    'scroll_until_found',
+    'type_text',
+    'clear_text',
+    'press_enter',
+    'global_action',
+    'open_app',
+    'wait',
+    'task_complete',
+    'task_failed',
+  ] as string[],
+
+  /**
    * Access the info/settings of a specific app without leaving it.
    * Excludes open_app and global_action (HOME/BACK) to prevent navigating away.
    */
