@@ -160,6 +160,87 @@ describe('DualModelProvider', () => {
     });
   });
 
+  describe('dispatchToolFilter', () => {
+    const ALL_TOOLS: Tool[] = [
+      {
+        name: 'tap',
+        description: 'Tap a node',
+        parameters: { type: 'object', properties: { nodeId: { type: 'string', description: 'Node' } }, required: ['nodeId'] },
+      },
+      {
+        name: 'type_text',
+        description: 'Type text',
+        parameters: { type: 'object', properties: { text: { type: 'string', description: 'Text' } }, required: ['text'] },
+      },
+      {
+        name: 'scroll',
+        description: 'Scroll',
+        parameters: { type: 'object', properties: { direction: { type: 'string', description: 'Dir' } }, required: ['direction'] },
+      },
+    ];
+
+    it('passes only filtered tools to dispatchProvider', async () => {
+      const reasoning = makeMockProvider('reasoning');
+      const dispatch = makeMockProvider('dispatch');
+      const provider = new DualModelProvider({
+        reasoningProvider: reasoning,
+        dispatchProvider: dispatch,
+        dispatchToolFilter: ['tap', 'type_text'],
+      });
+
+      await provider.generateWithTools('fill form', ALL_TOOLS);
+
+      const [, calledTools] = dispatch.generateWithTools.mock.calls[0];
+      expect((calledTools as Tool[]).map((t: Tool) => t.name)).toEqual(['tap', 'type_text']);
+      expect(reasoning.generateWithTools).not.toHaveBeenCalled();
+    });
+
+    it('passes full tool list when dispatchToolFilter is not set', async () => {
+      const reasoning = makeMockProvider('reasoning');
+      const dispatch = makeMockProvider('dispatch');
+      const provider = new DualModelProvider({
+        reasoningProvider: reasoning,
+        dispatchProvider: dispatch,
+      });
+
+      await provider.generateWithTools('do task', ALL_TOOLS);
+
+      const [, calledTools] = dispatch.generateWithTools.mock.calls[0];
+      expect((calledTools as Tool[]).length).toBe(ALL_TOOLS.length);
+    });
+
+    it('passes empty tools array to dispatch when filter matches nothing', async () => {
+      const reasoning = makeMockProvider('reasoning');
+      const dispatch = makeMockProvider('dispatch');
+      const provider = new DualModelProvider({
+        reasoningProvider: reasoning,
+        dispatchProvider: dispatch,
+        dispatchToolFilter: ['nonexistent_tool'],
+      });
+
+      await provider.generateWithTools('do task', ALL_TOOLS);
+
+      const [, calledTools] = dispatch.generateWithTools.mock.calls[0];
+      expect((calledTools as Tool[]).length).toBe(0);
+    });
+
+    it('passes full tool list to reasoningProvider on dispatch fallback', async () => {
+      const reasoning = makeMockProvider('reasoning');
+      const dispatch = makeMockProvider('dispatch');
+      dispatch.generateWithTools.mockRejectedValue(new Error('OOM'));
+      const provider = new DualModelProvider({
+        reasoningProvider: reasoning,
+        dispatchProvider: dispatch,
+        dispatchToolFilter: ['tap'],
+      });
+
+      await provider.generateWithTools('do task', ALL_TOOLS);
+
+      const [, reasoningTools] = reasoning.generateWithTools.mock.calls[0];
+      expect((reasoningTools as Tool[]).length).toBe(ALL_TOOLS.length);
+    });
+  });
+
   describe('isDispatchReady', () => {
     it('returns false when no dispatch provider configured', () => {
       const reasoning = makeMockProvider('reasoning');
