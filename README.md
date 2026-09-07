@@ -65,6 +65,11 @@ npm install react-native-device-agent react-native-accessibility-controller
 yarn add react-native-device-agent react-native-accessibility-controller
 ```
 
+> **Note:** Packages are in development. Install directly from GitHub if npm fails:
+> ```bash
+> npm install github:bedda-tech/react-native-device-agent github:bedda-tech/react-native-accessibility-controller
+> ```
+
 ### Requirements
 
 - React Native >= 0.76 (New Architecture)
