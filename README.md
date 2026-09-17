@@ -1,7 +1,6 @@
 # react-native-device-agent
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![npm version](https://img.shields.io/npm/v/react-native-device-agent.svg)](https://www.npmjs.com/package/react-native-device-agent)
 [![build](https://img.shields.io/github/actions/workflow/status/bedda-tech/react-native-device-agent/ci.yml?branch=main)](https://github.com/bedda-tech/react-native-device-agent/actions)
 
 **Agent orchestration loop for on-device AI phone control.** Connects LLM reasoning to phone actions via accessibility APIs. Observe the screen, think, act, repeat -- all on-device.
