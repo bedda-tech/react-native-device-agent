@@ -7,6 +7,21 @@
 
 Part of the [Deft](https://github.com/bedda-tech/deft) ecosystem: an open-source, fully on-device AI phone agent.
 
+```bash
+npm install react-native-device-agent react-native-accessibility-controller
+```
+
+<!-- TODO before npm publish: record a 20-40 s screen capture of an agent run, save as docs/demo.gif, and uncomment the line below. -->
+<!-- ![Agent running a task on Android](docs/demo.gif) -->
+
+```typescript
+import { useAgent, GemmaProvider } from 'react-native-device-agent';
+
+const { execute } = useAgent({ provider: new GemmaProvider({ model: 'GEMMA4_E4B' }) });
+// in a handler:
+execute('Open Settings and turn on Wi-Fi');
+```
+
 ---
 
 ## Architecture

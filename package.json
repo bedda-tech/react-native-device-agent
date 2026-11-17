@@ -1,6 +1,6 @@
 {
   "name": "react-native-device-agent",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Agent orchestration loop for on-device AI phone control. Connects LLM reasoning to phone actions via accessibility APIs.",
   "main": "lib/commonjs/index.js",
   "module": "lib/typescript/index.js",
@@ -15,6 +15,7 @@
   ],
   "scripts": {
     "build": "tsc && tsc --project tsconfig.build.json",
+    "prepack": "npm run build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "test": "jest",
