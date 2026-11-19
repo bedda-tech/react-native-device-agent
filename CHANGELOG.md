@@ -7,6 +7,17 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.3.0] – 2026-11-17
+
+### Added
+- `FunctionGemmaProvider` and `DualModelProvider` for dual-model inference (FunctionGemma 270M for tool calls, main model for reasoning)
+- `dispatchToolFilter` on `DualModelProvider` to cap the tool set sent to the small model
+- `WEB` tool preset for Chrome browser control
+- `TaskPlanner` forwards earlier subtask results as context to later subtasks
+
+### Changed
+- Documentation covers `DualModelProvider`, `FunctionGemmaProvider`, `FallbackProvider` and all hooks
+
 ## [0.1.0] – 2026-04-19
 
 Initial public release.
